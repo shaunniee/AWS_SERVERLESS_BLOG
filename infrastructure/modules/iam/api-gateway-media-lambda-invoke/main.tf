@@ -1,0 +1,7 @@
+resource "aws_lambda_permission" "allow_api_gateway_invoke" {
+  statement_id  = "AllowAPIGatewayInvokePosts"
+  action        = "lambda:InvokeFunction"
+  function_name =  var.lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${var.api_gateway_endpoint}/*/*"
+}

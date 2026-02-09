@@ -17,3 +17,8 @@ output "distribution_status" {
     description = "The current status of the distribution"
     value       = aws_cloudfront_distribution.this.status
 }
+
+output "distribution_hosted_zone_id" {
+    description = "The ID of the hosted zone that CloudFront uses to route traffic to the distribution"
+    value       = aws_cloudfront_distribution.this.hosted_zone_id
+}

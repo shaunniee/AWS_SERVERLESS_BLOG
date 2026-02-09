@@ -1,64 +1,76 @@
-resource "aws_s3_bucket" "this" {
-    bucket = var.bucket_name
-    tags   = var.tags
-    force_destroy = var.force_destroy
-    lifecycle {
-      prevent_destroy = var.prevent_destroy
-    }
+resource "aws_s3_bucket" "protected" {
+  count         = var.prevent_destroy ? 1 : 0
+  bucket        = var.bucket_name
+  tags          = var.tags
+  force_destroy = var.force_destroy
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_s3_bucket" "unprotected" {
+  count         = var.prevent_destroy ? 0 : 1
+  bucket        = var.bucket_name
+  tags          = var.tags
+  force_destroy = var.force_destroy
+  lifecycle {
+    prevent_destroy = false
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "this" {
-    count = var.private_bucket ? 1 : 0
-    bucket = aws_s3_bucket.this.id
-    block_public_acls       = true
-    block_public_policy     = true
-    ignore_public_acls      = true
-    restrict_public_buckets = true 
+  count                   = var.private_bucket ? 1 : 0
+  bucket                  = var.prevent_destroy ? aws_s3_bucket.protected[0].id : aws_s3_bucket.unprotected[0].id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 resource "aws_s3_bucket_versioning" "this" {
-    count = var.versioning_enabled ? 1 : 0
-    bucket = aws_s3_bucket.this.id
-    versioning_configuration {
-        status = "Enabled"
-    }
+  count  = var.versioning_enabled ? 1 : 0
+  bucket = var.prevent_destroy ? aws_s3_bucket.protected[0].id : aws_s3_bucket.unprotected[0].id
+  versioning_configuration {
+    status = "Enabled"
+  }
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
-    count = var.server_side_encryption_enabled ? 1 : 0
-    bucket = aws_s3_bucket.this.id
-    rule {
-        apply_server_side_encryption_by_default {
-            sse_algorithm = "AES256"
-        }
+  count  = var.server_side_encryption_enabled ? 1 : 0
+  bucket = var.prevent_destroy ? aws_s3_bucket.protected[0].id : aws_s3_bucket.unprotected[0].id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
     }
-  
+  }
+
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "this" {
   count  = length(var.lifecycle_rules) > 0 ? 1 : 0
-  bucket = aws_s3_bucket.this.id
-   dynamic "rule" {
+  bucket = var.prevent_destroy ? aws_s3_bucket.protected[0].id : aws_s3_bucket.unprotected[0].id
+  dynamic "rule" {
     for_each = var.lifecycle_rules
     content {
       id     = rule.value.id
       status = lookup(rule.value, "status", "Enabled")
 
-      # Filter block
-      dynamic "filter" {
-        for_each = rule.value.filter != null ? [rule.value.filter] : []
-        content {
-          prefix = lookup(filter.value, "prefix", null)
+    dynamic "filter" {
+  for_each = rule.value.filter != null ? [rule.value.filter] : []
 
-          dynamic "tag" {
-            for_each = lookup(filter.value, "tag", {}) 
-            content {
-              key   = tag.key
-              value = tag.value
-            }
-          }
-        }
+  content {
+    prefix = try(filter.value.prefix, null)
+
+    dynamic "tag" {
+      for_each = filter.value.tag != null ? [filter.value.tag] : []
+
+      content {
+        key   = tag.value.key
+        value = tag.value.value
       }
+    }
+  }
+}
 
       # Transition block
       dynamic "transition" {

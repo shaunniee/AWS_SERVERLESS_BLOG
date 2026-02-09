@@ -1,6 +1,7 @@
 resource "aws_s3_bucket" "media_bucket" {
     bucket = "${var.name_prefix}-media-bucket"
     tags   = var.tags
+    force_destroy = false
     
     lifecycle {
         prevent_destroy = true

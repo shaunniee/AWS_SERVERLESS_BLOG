@@ -45,8 +45,14 @@ variable "lifecycle_rules" {
   type = list(object({
     id        = string
     enabled   = optional(bool, true)
-    filter    = optional(map(string), {})   # e.g., { prefix = "temp/" } or { tags = { "type" = "log" } }
-    transition = optional(list(object({
+filter = optional(object({
+      prefix = optional(string)
+      tag = optional(object({
+        key   = string
+        value = string
+      }))
+    }))
+        transition = optional(list(object({
       days          = number
       storage_class = string
     })), [])

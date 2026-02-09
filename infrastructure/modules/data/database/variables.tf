@@ -46,18 +46,14 @@ variable "attributes" {
     } ]
 }
 
+
 variable "gsi" {
-    description = "A list of global secondary indexes for the DynamoDB table"
-    type        = list(object({
-        name        = string
-        hash_key    = string
-        range_key   = string
-        projection_type = string
-    }))
-    default = [ {
-        name = ""
-        hash_key = ""
-        range_key = ""
-        projection_type = ""
-    } ]
+  type = list(object({
+    name            = string
+    hash_key        = string
+    range_key       = optional(string)
+    projection_type = string
+    non_key_attributes = optional(list(string))
+  }))
+    default = []
 }

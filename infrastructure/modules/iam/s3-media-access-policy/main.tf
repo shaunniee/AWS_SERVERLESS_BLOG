@@ -6,11 +6,9 @@ resource "aws_iam_policy" "s3-media-bucket-access" {
         Statement = [{
         Effect = "Allow"
         Action = [
-            "s3:GetObject",
             "s3:PutObject",
-            "s3:DeleteObject"
         ]
-        Resource = "${var.bucket_arn}/*"
+        Resource = "${var.bucket_arn}/media/*"
         }]
   
 })

@@ -27,31 +27,31 @@ exports.handler = async (event) => {
     }
 
     // UPDATE
-    if (method === "PUT" && path === "/admin/posts/{id}") {
+    if (method === "PUT" && path === "/admin/posts/{postId}") {
       // return updatePost(postId, body);
       return response(200, "Update post route");
     }
 
     // PUBLISH
-    if (method === "POST" && path === "/admin/posts/{id}/publish") {
+    if (method === "POST" && path === "/admin/posts/{postId}/publish") {
       // return changeStatus(postId, "PUBLISHED");
       return response(200, "Publish post route");
     }
 
     // UNPUBLISH
-    if (method === "POST" && path === "/admin/posts/{id}/unpublish") {
+    if (method === "POST" && path === "/admin/posts/{postId}/unpublish") {
       // return changeStatus(postId, "UNPUBLISHED");
       return response(200, "Unpublish post route");
     }
 
     // ARCHIVE
-    if (method === "POST" && path === "/admin/posts/{id}/archive") {
+    if (method === "POST" && path === "/admin/posts/{postId}/archive") {
       // return changeStatus(postId, "ARCHIVED");
       return response(200, "Archive post route");
     }
 
     // DELETE
-    if (method === "DELETE" && path === "/admin/posts/{id}") {
+    if (method === "DELETE" && path === "/admin/posts/{postId}") {
       // return deletePost(postId);
       return response(200, "Delete post route");
     }
@@ -220,9 +220,9 @@ exports.handler = async (event) => {
 //   updates.push(`#${name} = :${name}`);
 // }
 
-// function response(code, body) {
-//   return {
-//     statusCode: code,
-//     body: JSON.stringify(body)
-//   };
-// }
+function response(code, body) {
+  return {
+    statusCode: code,
+    body: JSON.stringify(body)
+  };
+}

@@ -1,12 +1,12 @@
 output "bucket_name" {
   description = "The name of the S3 bucket."
-  value       = aws_s3_bucket.bucket.id
+  value       = var.prevent_destroy ? aws_s3_bucket.protected[0].id : aws_s3_bucket.unprotected[0].id
 }
 output "bucket_arn" {
   description = "The ARN of the S3 bucket."
-  value       = aws_s3_bucket.bucket.arn
+  value       = var.prevent_destroy ? aws_s3_bucket.protected[0].arn : aws_s3_bucket.unprotected[0].arn
 }
 output "bucket_domain_name" {
     description = "The domain name of the S3 bucket."
-    value       = aws_s3_bucket.bucket.bucket_domain_name
+    value       = var.prevent_destroy ? aws_s3_bucket.protected[0].bucket_domain_name : aws_s3_bucket.unprotected[0].bucket_domain_name
 }

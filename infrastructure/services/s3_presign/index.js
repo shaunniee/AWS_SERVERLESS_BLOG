@@ -6,47 +6,48 @@ const s3 = new S3Client({});
 const BUCKET = process.env.MEDIA_BUCKET;
 
 exports.handler = async (event) => {
-  try {
-    const body = JSON.parse(event.body || "{}");
+  console.log("S3 presign lambda invoked with event:", JSON.stringify(event));
+//   try {
+//     const body = JSON.parse(event.body || "{}");
 
-    if (!body.postId || !body.contentType) {
-      return response(400, "postId and contentType are required");
-    }
+//     if (!body.postId || !body.contentType) {
+//       return response(400, "postId and contentType are required");
+//     }
 
-    // Optional safety check
-    if (!body.contentType.startsWith("image/")) {
-      return response(400, "Only image uploads are allowed");
-    }
+//     // Optional safety check
+//     if (!body.contentType.startsWith("image/")) {
+//       return response(400, "Only image uploads are allowed");
+//     }
 
-    const extension = body.contentType.split("/")[1];
-    const key = `posts/${body.postId}/${randomUUID()}.${extension}`;
+//     const extension = body.contentType.split("/")[1];
+//     const key = `posts/${body.postId}/${randomUUID()}.${extension}`;
 
-    const command = new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      ContentType: body.contentType
-    });
+//     const command = new PutObjectCommand({
+//       Bucket: BUCKET,
+//       Key: key,
+//       ContentType: body.contentType
+//     });
 
-    const uploadUrl = await getSignedUrl(s3, command, {
-      expiresIn: 300 // 5 minutes
-    });
+//     const uploadUrl = await getSignedUrl(s3, command, {
+//       expiresIn: 300 // 5 minutes
+//     });
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        uploadUrl,
-        key
-      })
-    };
-  } catch (err) {
-    console.error(err);
-    return response(500, "Failed to generate upload URL");
-  }
-};
+//     return {
+//       statusCode: 200,
+//       body: JSON.stringify({
+//         uploadUrl,
+//         key
+//       })
+//     };
+//   } catch (err) {
+//     console.error(err);
+//     return response(500, "Failed to generate upload URL");
+//   }
+// };
 
-function response(statusCode, message) {
-  return {
-    statusCode,
-    body: JSON.stringify({ message })
-  };
+// function response(statusCode, message) {
+//   return {
+//     statusCode,
+//     body: JSON.stringify({ message })
+//   };
 }

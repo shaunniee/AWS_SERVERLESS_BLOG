@@ -17,37 +17,43 @@ exports.handler = async (event) => {
   try {
     const method = event.httpMethod;
     const path = event.resource;
-    const postId = event.pathParameters?.id;
-    const body = event.body ? JSON.parse(event.body) : {};
+    // const postId = event.pathParameters?.id;
+    // const body = event.body ? JSON.parse(event.body) : {};
 
     // CREATE
     if (method === "POST" && path === "/admin/posts") {
-      return createPost(body, event);
+      // return createPost(body, event);
+      return response(200, "Create post route");
     }
 
     // UPDATE
     if (method === "PUT" && path === "/admin/posts/{id}") {
-      return updatePost(postId, body);
+      // return updatePost(postId, body);
+      return response(200, "Update post route");
     }
 
     // PUBLISH
     if (method === "POST" && path === "/admin/posts/{id}/publish") {
-      return changeStatus(postId, "PUBLISHED");
+      // return changeStatus(postId, "PUBLISHED");
+      return response(200, "Publish post route");
     }
 
     // UNPUBLISH
     if (method === "POST" && path === "/admin/posts/{id}/unpublish") {
-      return changeStatus(postId, "UNPUBLISHED");
+      // return changeStatus(postId, "UNPUBLISHED");
+      return response(200, "Unpublish post route");
     }
 
     // ARCHIVE
     if (method === "POST" && path === "/admin/posts/{id}/archive") {
-      return changeStatus(postId, "ARCHIVED");
+      // return changeStatus(postId, "ARCHIVED");
+      return response(200, "Archive post route");
     }
 
     // DELETE
     if (method === "DELETE" && path === "/admin/posts/{id}") {
-      return deletePost(postId);
+      // return deletePost(postId);
+      return response(200, "Delete post route");
     }
 
     return response(404, "Route not found");
@@ -61,162 +67,162 @@ exports.handler = async (event) => {
 // Handlers
 /////////////////////
 
-async function createPost(body, event) {
-  if (!body.title || !body.content) {
-    return response(400, "title and content required");
-  }
+// async function createPost(body, event) {
+//   if (!body.title || !body.content) {
+//     return response(400, "title and content required");
+//   }
 
-  const postId = randomUUID();
-  const timestamp = now();
+//   const postId = randomUUID();
+//   const timestamp = now();
 
-  const item = {
-    PostID: { S: postId },
-    Title: { S: body.title },
-    Content: { S: body.content },
-    Status: { S: "DRAFT" },
-    AuthorID: { S: event.requestContext.authorizer.claims.sub },
-    CreatedAt: { N: timestamp.toString() },
-    EditedAt: { N: timestamp.toString() }
-  };
+//   const item = {
+//     PostID: { S: postId },
+//     Title: { S: body.title },
+//     Content: { S: body.content },
+//     Status: { S: "DRAFT" },
+//     AuthorID: { S: event.requestContext.authorizer.claims.sub },
+//     CreatedAt: { N: timestamp.toString() },
+//     EditedAt: { N: timestamp.toString() }
+//   };
 
-  if (body.mainImageKey) {
-    item.MainImageKey = { S: body.mainImageKey };
-  }
+//   if (body.mainImageKey) {
+//     item.MainImageKey = { S: body.mainImageKey };
+//   }
 
-  if (Array.isArray(body.imageKeys)) {
-    item.ImageKeys = {
-      L: body.imageKeys.map(k => ({ S: k }))
-    };
-  }
+//   if (Array.isArray(body.imageKeys)) {
+//     item.ImageKeys = {
+//       L: body.imageKeys.map(k => ({ S: k }))
+//     };
+//   }
 
-  await client.send(new PutItemCommand({
-    TableName: TABLE,
-    Item: item
-  }));
+//   await client.send(new PutItemCommand({
+//     TableName: TABLE,
+//     Item: item
+//   }));
 
-  return response(201, { postId });
-}
+//   return response(201, { postId });
+// }
 
-async function updatePost(postId, body) {
-  if (!postId) return response(400, "PostID required");
+// async function updatePost(postId, body) {
+//   if (!postId) return response(400, "PostID required");
 
-  const existing = await getPost(postId);
-  if (!existing) return response(404, "Post not found");
-  if (existing.Status.S === "ARCHIVED") {
-    return response(400, "Archived posts cannot be edited");
-  }
+//   const existing = await getPost(postId);
+//   if (!existing) return response(404, "Post not found");
+//   if (existing.Status.S === "ARCHIVED") {
+//     return response(400, "Archived posts cannot be edited");
+//   }
 
-  const updates = [];
-  const values = {};
-  const names = {};
+//   const updates = [];
+//   const values = {};
+//   const names = {};
 
-  setIf(body.title, "Title", body.title, updates, names, values, "S");
-  setIf(body.content, "Content", body.content, updates, names, values, "S");
-  setIf(body.mainImageKey, "MainImageKey", body.mainImageKey, updates, names, values, "S");
+//   setIf(body.title, "Title", body.title, updates, names, values, "S");
+//   setIf(body.content, "Content", body.content, updates, names, values, "S");
+//   setIf(body.mainImageKey, "MainImageKey", body.mainImageKey, updates, names, values, "S");
 
-  if (Array.isArray(body.imageKeys)) {
-    names["#ImageKeys"] = "ImageKeys";
-    values[":ImageKeys"] = {
-      L: body.imageKeys.map(k => ({ S: k }))
-    };
-    updates.push("#ImageKeys = :ImageKeys");
-  }
+//   if (Array.isArray(body.imageKeys)) {
+//     names["#ImageKeys"] = "ImageKeys";
+//     values[":ImageKeys"] = {
+//       L: body.imageKeys.map(k => ({ S: k }))
+//     };
+//     updates.push("#ImageKeys = :ImageKeys");
+//   }
 
-  names["#EditedAt"] = "EditedAt";
-  values[":EditedAt"] = { N: now().toString() };
-  updates.push("#EditedAt = :EditedAt");
+//   names["#EditedAt"] = "EditedAt";
+//   values[":EditedAt"] = { N: now().toString() };
+//   updates.push("#EditedAt = :EditedAt");
 
-  await client.send(new UpdateItemCommand({
-    TableName: TABLE,
-    Key: { PostID: { S: postId } },
-    UpdateExpression: "SET " + updates.join(", "),
-    ExpressionAttributeNames: names,
-    ExpressionAttributeValues: values
-  }));
+//   await client.send(new UpdateItemCommand({
+//     TableName: TABLE,
+//     Key: { PostID: { S: postId } },
+//     UpdateExpression: "SET " + updates.join(", "),
+//     ExpressionAttributeNames: names,
+//     ExpressionAttributeValues: values
+//   }));
 
-  return response(200, "Post updated");
-}
+//   return response(200, "Post updated");
+// }
 
-async function changeStatus(postId, newStatus) {
-  if (!postId) return response(400, "PostID required");
+// async function changeStatus(postId, newStatus) {
+//   if (!postId) return response(400, "PostID required");
 
-  const existing = await getPost(postId);
-  if (!existing) return response(404, "Post not found");
+//   const existing = await getPost(postId);
+//   if (!existing) return response(404, "Post not found");
 
-  if (existing.Status.S === "ARCHIVED") {
-    return response(400, "Archived posts cannot change status");
-  }
+//   if (existing.Status.S === "ARCHIVED") {
+//     return response(400, "Archived posts cannot change status");
+//   }
 
-  const updates = [
-    "#Status = :Status",
-    "#EditedAt = :EditedAt"
-  ];
+//   const updates = [
+//     "#Status = :Status",
+//     "#EditedAt = :EditedAt"
+//   ];
 
-  const names = {
-    "#Status": "Status",
-    "#EditedAt": "EditedAt"
-  };
+//   const names = {
+//     "#Status": "Status",
+//     "#EditedAt": "EditedAt"
+//   };
 
-  const values = {
-    ":Status": { S: newStatus },
-    ":EditedAt": { N: now().toString() }
-  };
+//   const values = {
+//     ":Status": { S: newStatus },
+//     ":EditedAt": { N: now().toString() }
+//   };
 
-  if (
-    newStatus === "PUBLISHED" &&
-    !existing.PublishedAt
-  ) {
-    updates.push("#PublishedAt = :PublishedAt");
-    names["#PublishedAt"] = "PublishedAt";
-    values[":PublishedAt"] = { N: now().toString() };
-  }
+//   if (
+//     newStatus === "PUBLISHED" &&
+//     !existing.PublishedAt
+//   ) {
+//     updates.push("#PublishedAt = :PublishedAt");
+//     names["#PublishedAt"] = "PublishedAt";
+//     values[":PublishedAt"] = { N: now().toString() };
+//   }
 
-  await client.send(new UpdateItemCommand({
-    TableName: TABLE,
-    Key: { PostID: { S: postId } },
-    UpdateExpression: "SET " + updates.join(", "),
-    ExpressionAttributeNames: names,
-    ExpressionAttributeValues: values
-  }));
+//   await client.send(new UpdateItemCommand({
+//     TableName: TABLE,
+//     Key: { PostID: { S: postId } },
+//     UpdateExpression: "SET " + updates.join(", "),
+//     ExpressionAttributeNames: names,
+//     ExpressionAttributeValues: values
+//   }));
 
-  return response(200, `Post ${newStatus.toLowerCase()}`);
-}
+//   return response(200, `Post ${newStatus.toLowerCase()}`);
+// }
 
-async function deletePost(postId) {
-  if (!postId) return response(400, "PostID required");
+// async function deletePost(postId) {
+//   if (!postId) return response(400, "PostID required");
 
-  await client.send(new DeleteItemCommand({
-    TableName: TABLE,
-    Key: { PostID: { S: postId } }
-  }));
+//   await client.send(new DeleteItemCommand({
+//     TableName: TABLE,
+//     Key: { PostID: { S: postId } }
+//   }));
 
-  // later: emit EventBridge event for image cleanup
+//   // later: emit EventBridge event for image cleanup
 
-  return response(200, "Post deleted");
-}
+//   return response(200, "Post deleted");
+// }
 
-/////////////////////
-// Helpers
-/////////////////////
+// /////////////////////
+// // Helpers
+// /////////////////////
 
-async function getPost(postId) {
-  const res = await client.send(new GetItemCommand({
-    TableName: TABLE,
-    Key: { PostID: { S: postId } }
-  }));
-  return res.Item;
-}
+// async function getPost(postId) {
+//   const res = await client.send(new GetItemCommand({
+//     TableName: TABLE,
+//     Key: { PostID: { S: postId } }
+//   }));
+//   return res.Item;
+// }
 
-function setIf(value, name, raw, updates, names, values, type) {
-  if (!value) return;
-  names[`#${name}`] = name;
-  values[`:${name}`] = { [type]: raw };
-  updates.push(`#${name} = :${name}`);
-}
+// function setIf(value, name, raw, updates, names, values, type) {
+//   if (!value) return;
+//   names[`#${name}`] = name;
+//   values[`:${name}`] = { [type]: raw };
+//   updates.push(`#${name} = :${name}`);
+// }
 
-function response(code, body) {
-  return {
-    statusCode: code,
-    body: JSON.stringify(body)
-  };
-}
+// function response(code, body) {
+//   return {
+//     statusCode: code,
+//     body: JSON.stringify(body)
+//   };
+// }

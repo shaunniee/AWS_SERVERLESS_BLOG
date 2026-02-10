@@ -3,6 +3,9 @@ locals {
   admin_lambda_methods = {
     "posts" = ["POST", "GET"]
     "post_id" = ["GET", "PUT", "PATCH", "DELETE"]
+    "post_publish" = ["POST"]
+    "post_unpublish" = ["POST"]
+    "post_archive" = ["POST"]
   }
 }
 resource "aws_api_gateway_integration" "admin_lambda" {

@@ -16,3 +16,13 @@ resource "aws_api_gateway_integration" "post_id_get_integration" {
   integration_http_method = "POST"
   uri         = var.public_lambda_arn
 }
+
+# Define /leads integration in API Gateway
+resource "aws_api_gateway_integration" "leads_post_integration" {
+  rest_api_id = aws_api_gateway_rest_api.public_api.id
+  resource_id = aws_api_gateway_resource.leads.id   
+  http_method = aws_api_gateway_method.leads_post.http_method
+  type        = "AWS_PROXY"
+  integration_http_method = "POST"
+  uri         = var.leads_lambda_arn
+}

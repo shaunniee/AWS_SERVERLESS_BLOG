@@ -15,8 +15,18 @@ variable "public_lambda_arn" {
   
 }
 
-variable "lambda_version" {
+variable "public_lambda_version" {
     description = "The version of the Lambda function to integrate with API Gateway"
     type        = string
   
+}
+
+variable "leads_lambda_arn" {
+    description = "The ARN of the Leads Lambda function to integrate with API Gateway"
+    type        = string
+}
+
+variable "leads_lambda_version" {
+    description = "The version of the Leads Lambda function to integrate with API Gateway"
+    type        = string
 }

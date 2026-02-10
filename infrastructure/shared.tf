@@ -93,3 +93,28 @@ module "media_bucket" {
     }]
     tags        = var.tags
 }
+
+# Define Leads lambda (write only by public ,read only by admin )
+
+module "leads_lambda" {
+    source = "./modules/lambda"
+    function_name = "leads-lambda"
+    handler       = "index.handler"
+    runtime       = "nodejs18.x"
+    filename      = "services/leads_lambda/leads.zip"
+    tags          = var.tags
+    environment_variables = {
+        LEADS_TABLE= module.leads_table.table_name
+    }
+}
+# Define IAM policy for leads lambda to access the leads DynamoDB table with read/write permissions
+module "leads_lambda_dynamodb_policy" {
+    source = "./modules/iam/dynamodb-leads-read_write-policy"
+    table_arn = module.leads_table.table_arn
+}
+
+# Attach the IAM policy to the leads lambda execution role
+resource "aws_iam_role_policy_attachment" "leads_lambda_dynamodb_policy_attachment" {
+  policy_arn = module.leads_lambda_dynamodb_policy.policy_arn
+  role       = module.leads_lambda.lambda_role_name
+}

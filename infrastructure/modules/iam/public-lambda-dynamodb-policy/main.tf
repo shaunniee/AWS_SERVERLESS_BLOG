@@ -1,6 +1,5 @@
-resource "aws_iam_role_policy" "dynamo_db_public_read" {
+resource "aws_iam_policy" "dynamo_db_public_read" {
   name   = "dynamo_db_public_read"
-  role   = aws_iam_role.lambda_exec_role.name
 
   policy = jsonencode({
     Version = "2012-10-17"

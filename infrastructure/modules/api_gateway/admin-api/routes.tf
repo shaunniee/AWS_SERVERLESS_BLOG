@@ -40,7 +40,7 @@ resource "aws_api_gateway_resource" "admin_post_id" {
 
 # Define GET,PUT,PATCH,DELETE methods for /admin/posts/{postId}
 locals {
-admin_post_id_methods = ["GET", "PUT", "PATCH", "DELETE"]
+admin_post_id_methods = ["GET", "PUT", "DELETE"]
 }
 
 resource "aws_api_gateway_method" "admin_post_id_methods" {
@@ -52,6 +52,50 @@ resource "aws_api_gateway_method" "admin_post_id_methods" {
   authorizer_id = aws_api_gateway_authorizer.admin.id
 }
 
+# Define the /admin/posts/{postId}/publish resource
+resource "aws_api_gateway_resource" "admin_post_publish" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  parent_id   = aws_api_gateway_resource.admin_post_id.id
+  path_part   = "publish"
+}
+# Define POST method for /admin/posts/{postId}/publish
+resource "aws_api_gateway_method" "admin_post_publish_post" {
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  resource_id   = aws_api_gateway_resource.admin_post_publish.id
+  http_method   = "POST"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.admin.id
+}
+
+# Define the /admin/posts/{postId}/unpublish resource
+resource "aws_api_gateway_resource" "admin_post_unpublish" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  parent_id   = aws_api_gateway_resource.admin_post_id.id
+  path_part   = "unpublish"
+}
+# Define POST method for /admin/posts/{postId}/unpublish
+resource "aws_api_gateway_method" "admin_post_unpublish_post" {
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  resource_id   = aws_api_gateway_resource.admin_post_unpublish.id
+  http_method   = "POST"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.admin.id
+}
+
+# Define the /admin/posts/{postId}/archive resource
+resource "aws_api_gateway_resource" "admin_post_archive" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  parent_id   = aws_api_gateway_resource.admin_post_id.id
+  path_part   = "archive"
+}
+# Define POST method for /admin/posts/{postId}/archive
+resource "aws_api_gateway_method" "admin_post_archive_post" {
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  resource_id   = aws_api_gateway_resource.admin_post_archive.id
+  http_method   = "POST"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.admin.id
+}
 
 # Define Media Url Resource
 resource "aws_api_gateway_resource" "admin_media" {

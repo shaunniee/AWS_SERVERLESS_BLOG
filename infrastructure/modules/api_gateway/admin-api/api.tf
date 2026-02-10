@@ -11,6 +11,7 @@ resource "aws_api_gateway_deployment" "this" {
   triggers = {
     lambda_version_admin = var.admin_lambda_version
     lambda_version_media = var.media_lambda_version
+    lambda_version_leads = var.leads_lambda_version
   }
 }
 

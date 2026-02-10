@@ -44,3 +44,16 @@ resource "aws_api_gateway_integration" "media_upload_lambda" {
     aws_api_gateway_method.admin_media_upload_post
   ]
 }
+
+# Integrate GET /admin/leads
+resource "aws_api_gateway_integration" "leads_lambda" {
+  rest_api_id             = aws_api_gateway_rest_api.api.id
+  resource_id             = aws_api_gateway_resource.admin_leads.id
+  http_method             = aws_api_gateway_method.admin_leads_get.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.leads_lambda_arn
+  depends_on = [
+    aws_api_gateway_method.admin_leads_get
+  ]
+}

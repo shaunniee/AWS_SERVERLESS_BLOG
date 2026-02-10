@@ -30,7 +30,10 @@ module "public_api_gateway" {
     name_prefix = var.name_prefix
     tags        = var.tags
     public_lambda_arn = module.public_read_lambda.lambda_function_invoke_arn
-    lambda_version = module.public_read_lambda.lambda_version
+    public_lambda_version = module.public_read_lambda.lambda_version
+    leads_lambda_arn = module.leads_lambda.lambda_function_invoke_arn
+    leads_lambda_version = module.leads_lambda.lambda_version
+
 }
 
 # Give public api gateway to invoke the public lambda

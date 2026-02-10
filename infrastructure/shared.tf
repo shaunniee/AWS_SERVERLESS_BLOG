@@ -107,6 +107,7 @@ module "leads_lambda" {
         LEADS_TABLE= module.leads_table.table_name
     }
 }
+
 # Define IAM policy for leads lambda to access the leads DynamoDB table with read/write permissions
 module "leads_lambda_dynamodb_policy" {
     source = "./modules/iam/dynamodb-leads-read_write-policy"
@@ -117,4 +118,18 @@ module "leads_lambda_dynamodb_policy" {
 resource "aws_iam_role_policy_attachment" "leads_lambda_dynamodb_policy_attachment" {
   policy_arn = module.leads_lambda_dynamodb_policy.policy_arn
   role       = module.leads_lambda.lambda_role_name
+}
+
+# allow public api and admin api to invoke leads lambda
+
+module "leads_lambda_invoke_permission_public_api" {
+    source = "./modules/iam/api-gateway-public-lambda-invoke"
+    lambda_function_name = module.leads_lambda.lambda_function_name
+    api_gateway_endpoint = module.public_api_gateway.api_gateway_execution_arn
+}
+
+module "leads_lambda_invoke_permission_admin_api" {
+    source = "./modules/iam/api-gateway-admin-lambda-invoke"
+    lambda_function_name = module.leads_lambda.lambda_function_name
+    api_gateway_endpoint = module.admin_api_gateway.api_gateway_execution_arn
 }

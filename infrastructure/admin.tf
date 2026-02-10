@@ -62,9 +62,12 @@ module "admin_api_gateway" {
     admin_lambda_version = module.admin_posts_lambda.lambda_version
     media_lambda_arn = module.admin_media_presign_lambda.lambda_function_invoke_arn
     media_lambda_version = module.admin_media_presign_lambda.lambda_version
+    leads_lambda_arn = module.leads_lambda.lambda_function_invoke_arn
+    leads_lambda_version = module.leads_lambda.lambda_version
     cognito_user_pool_arn = module.auth.user_pool_arn
     tags = var.tags
 }
+
 # allow api gateway to invoke admin lambda
 module "apigw_invoke_admin_lambda" {
     source = "./modules/iam/api-gateway-admin-lambda-invoke"

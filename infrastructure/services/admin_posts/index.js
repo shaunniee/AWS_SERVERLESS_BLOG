@@ -1,228 +1,175 @@
+const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
-  DynamoDBClient,
-  PutItemCommand,
-  GetItemCommand,
-  UpdateItemCommand,
-  DeleteItemCommand
-} = require("@aws-sdk/client-dynamodb");
-
+  DynamoDBDocumentClient,
+  PutCommand,
+  GetCommand,
+  UpdateCommand,
+  QueryCommand,
+  DeleteCommand
+} = require("@aws-sdk/lib-dynamodb");
 const { randomUUID } = require("crypto");
 
 const client = new DynamoDBClient({});
+const ddb = DynamoDBDocumentClient.from(client);
+
 const TABLE = process.env.POSTS_TABLE;
 
-const now = () => Math.floor(Date.now() / 1000);
+const now = () => Date.now();
 
-exports.handler = async (event) => {
+async function handler(event) {
   try {
     const method = event.httpMethod;
     const path = event.resource;
-    // const postId = event.pathParameters?.id;
-    // const body = event.body ? JSON.parse(event.body) : {};
+    const postId = event.pathParameters?.postId;
+    const body = event.body ? JSON.parse(event.body) : {};
+    const authorID = event.requestContext.authorizer.claims.sub;
 
-    // CREATE
-    if (method === "POST" && path === "/admin/posts") {
-      // return createPost(body, event);
-      return response(200, "Create post route");
-    }
+    // ROUTER
+    if (method === "POST" && path === "/admin/posts") return await createPost(body, authorID);
+    if (method === "GET" && path === "/admin/posts") return await listPosts(authorID);
+    if (method === "GET" && path === "/admin/posts/{postId}") return await getPost(postId);
+    if (method === "PUT" && path === "/admin/posts/{postId}") return await updatePost(postId, body);
+    if (method === "DELETE" && path === "/admin/posts/{postId}") return await deletePost(postId);
+    if (method === "POST" && path.endsWith("/publish")) return await publishPost(postId);
+    if (method === "POST" && path.endsWith("/unpublish")) return await unpublishPost(postId);
+    if (method === "POST" && path.endsWith("/archive")) return await archivePost(postId);
 
-    // UPDATE
-    if (method === "PUT" && path === "/admin/posts/{postId}") {
-      // return updatePost(postId, body);
-      return response(200, "Update post route");
-    }
-
-    // PUBLISH
-    if (method === "POST" && path === "/admin/posts/{postId}/publish") {
-      // return changeStatus(postId, "PUBLISHED");
-      return response(200, "Publish post route");
-    }
-
-    // UNPUBLISH
-    if (method === "POST" && path === "/admin/posts/{postId}/unpublish") {
-      // return changeStatus(postId, "UNPUBLISHED");
-      return response(200, "Unpublish post route");
-    }
-
-    // ARCHIVE
-    if (method === "POST" && path === "/admin/posts/{postId}/archive") {
-      // return changeStatus(postId, "ARCHIVED");
-      return response(200, "Archive post route");
-    }
-
-    // DELETE
-    if (method === "DELETE" && path === "/admin/posts/{postId}") {
-      // return deletePost(postId);
-      return response(200, "Delete post route");
-    }
-
-    return response(404, "Route not found");
+    return response(404, { message: "Route not found" });
   } catch (err) {
     console.error(err);
-    return response(500, "Internal server error");
+    return response(500, { message: err.message });
   }
-};
+}
 
-/////////////////////
-// Handlers
-/////////////////////
+async function createPost(data, authorID) {
+  const post = {
+    postID: randomUUID(),
+    authorID: authorID,
+    title: data.title,
+    content: data.content,
+    status: "DRAFT",
+    createdAt: now(),
+    updatedAt: now(),
+  };
 
-// async function createPost(body, event) {
-//   if (!body.title || !body.content) {
-//     return response(400, "title and content required");
-//   }
+  await ddb.send(new PutCommand({ TableName: TABLE, Item: post }));
 
-//   const postId = randomUUID();
-//   const timestamp = now();
+  return response(201, post);
+}
 
-//   const item = {
-//     PostID: { S: postId },
-//     Title: { S: body.title },
-//     Content: { S: body.content },
-//     Status: { S: "DRAFT" },
-//     AuthorID: { S: event.requestContext.authorizer.claims.sub },
-//     CreatedAt: { N: timestamp.toString() },
-//     EditedAt: { N: timestamp.toString() }
-//   };
+async function listPosts(authorID) {
+  const result = await ddb.send(
+    new QueryCommand({
+      TableName: TABLE,
+      IndexName: "authorIDIndex",
+      KeyConditionExpression: "authorID = :a",
+      ExpressionAttributeValues: { ":a": authorID },
+      ScanIndexForward: false
+    })
+  );
 
-//   if (body.mainImageKey) {
-//     item.MainImageKey = { S: body.mainImageKey };
-//   }
+  return response(200, result.Items);
+}
 
-//   if (Array.isArray(body.imageKeys)) {
-//     item.ImageKeys = {
-//       L: body.imageKeys.map(k => ({ S: k }))
-//     };
-//   }
+async function getPost(postId) {
+  const result = await ddb.send(new GetCommand({ TableName: TABLE, Key: { postID: postId } }));
 
-//   await client.send(new PutItemCommand({
-//     TableName: TABLE,
-//     Item: item
-//   }));
+  if (!result.Item) return response(404, { message: "Post not found" });
 
-//   return response(201, { postId });
-// }
+  return response(200, result.Item);
+}
 
-// async function updatePost(postId, body) {
-//   if (!postId) return response(400, "PostID required");
+async function updatePost(postId, data) {
+  await ddb.send(new UpdateCommand({
+  TableName: TABLE,
+  Key: { postID: postId },
+  UpdateExpression: `
+    SET title = :t,
+        content = :c,
+        updatedAt = :u
+  `,
+  ConditionExpression: "#s IN (:draft, :unpublished)",
+  ExpressionAttributeNames: {
+    "#s": "status"
+  },
+  ExpressionAttributeValues: {
+    ":t": data.title,
+    ":c": data.content,
+    ":u": now(),
+    ":draft": "DRAFT",
+    ":unpublished": "UNPUBLISHED"
+  }
+}));
 
-//   const existing = await getPost(postId);
-//   if (!existing) return response(404, "Post not found");
-//   if (existing.Status.S === "ARCHIVED") {
-//     return response(400, "Archived posts cannot be edited");
-//   }
+  return response(200, { message: "Updated" });
+}
 
-//   const updates = [];
-//   const values = {};
-//   const names = {};
+async function publishPost(postId) {
+  await ddb.send(
+    new UpdateCommand({
+      TableName: TABLE,
+      Key: { postID: postId },
+      UpdateExpression: "SET #s = :p, publishedAt = :pa, updatedAt = :u",
+      ConditionExpression: "#s IN (:draft, :unpublished)",
+      ExpressionAttributeNames: { "#s": "status" },
+      ExpressionAttributeValues: {
+        ":p": "PUBLISHED",
+        ":pa": now(),
+        ":u": now(),
+        ":draft": "DRAFT",
+        ":unpublished": "UNPUBLISHED"
+      }
+    })
+  );
 
-//   setIf(body.title, "Title", body.title, updates, names, values, "S");
-//   setIf(body.content, "Content", body.content, updates, names, values, "S");
-//   setIf(body.mainImageKey, "MainImageKey", body.mainImageKey, updates, names, values, "S");
+  return response(200, { message: "Published" });
+}
 
-//   if (Array.isArray(body.imageKeys)) {
-//     names["#ImageKeys"] = "ImageKeys";
-//     values[":ImageKeys"] = {
-//       L: body.imageKeys.map(k => ({ S: k }))
-//     };
-//     updates.push("#ImageKeys = :ImageKeys");
-//   }
+async function unpublishPost(postId) {
+  await ddb.send(
+    new UpdateCommand({
+      TableName: TABLE,
+      Key: { postID: postId },
+      UpdateExpression: "SET #s = :u, updatedAt = :t",
+      ConditionExpression: "#s = :p",
+      ExpressionAttributeNames: { "#s": "status" },
+      ExpressionAttributeValues: {
+        ":u": "UNPUBLISHED",
+        ":p": "PUBLISHED",
+        ":t": now()
+      }
+    })
+  );
 
-//   names["#EditedAt"] = "EditedAt";
-//   values[":EditedAt"] = { N: now().toString() };
-//   updates.push("#EditedAt = :EditedAt");
+  return response(200, { message: "Unpublished" });
+}
 
-//   await client.send(new UpdateItemCommand({
-//     TableName: TABLE,
-//     Key: { PostID: { S: postId } },
-//     UpdateExpression: "SET " + updates.join(", "),
-//     ExpressionAttributeNames: names,
-//     ExpressionAttributeValues: values
-//   }));
+async function archivePost(postId) {
+  await ddb.send(
+    new UpdateCommand({
+      TableName: TABLE,
+      Key: { postID: postId },
+      UpdateExpression: "SET #s = :a, updatedAt = :t",
+      ExpressionAttributeNames: { "#s": "status" },
+      ExpressionAttributeValues: { ":a": "ARCHIVED", ":t": now() }
+    })
+  );
 
-//   return response(200, "Post updated");
-// }
+  return response(200, { message: "Archived" });
+}
 
-// async function changeStatus(postId, newStatus) {
-//   if (!postId) return response(400, "PostID required");
+async function deletePost(postId) {
+  await ddb.send(new DeleteCommand({ TableName: TABLE, Key: { postId } }));
+  return response(204);
+}
 
-//   const existing = await getPost(postId);
-//   if (!existing) return response(404, "Post not found");
-
-//   if (existing.Status.S === "ARCHIVED") {
-//     return response(400, "Archived posts cannot change status");
-//   }
-
-//   const updates = [
-//     "#Status = :Status",
-//     "#EditedAt = :EditedAt"
-//   ];
-
-//   const names = {
-//     "#Status": "Status",
-//     "#EditedAt": "EditedAt"
-//   };
-
-//   const values = {
-//     ":Status": { S: newStatus },
-//     ":EditedAt": { N: now().toString() }
-//   };
-
-//   if (
-//     newStatus === "PUBLISHED" &&
-//     !existing.PublishedAt
-//   ) {
-//     updates.push("#PublishedAt = :PublishedAt");
-//     names["#PublishedAt"] = "PublishedAt";
-//     values[":PublishedAt"] = { N: now().toString() };
-//   }
-
-//   await client.send(new UpdateItemCommand({
-//     TableName: TABLE,
-//     Key: { PostID: { S: postId } },
-//     UpdateExpression: "SET " + updates.join(", "),
-//     ExpressionAttributeNames: names,
-//     ExpressionAttributeValues: values
-//   }));
-
-//   return response(200, `Post ${newStatus.toLowerCase()}`);
-// }
-
-// async function deletePost(postId) {
-//   if (!postId) return response(400, "PostID required");
-
-//   await client.send(new DeleteItemCommand({
-//     TableName: TABLE,
-//     Key: { PostID: { S: postId } }
-//   }));
-
-//   // later: emit EventBridge event for image cleanup
-
-//   return response(200, "Post deleted");
-// }
-
-// /////////////////////
-// // Helpers
-// /////////////////////
-
-// async function getPost(postId) {
-//   const res = await client.send(new GetItemCommand({
-//     TableName: TABLE,
-//     Key: { PostID: { S: postId } }
-//   }));
-//   return res.Item;
-// }
-
-// function setIf(value, name, raw, updates, names, values, type) {
-//   if (!value) return;
-//   names[`#${name}`] = name;
-//   values[`:${name}`] = { [type]: raw };
-//   updates.push(`#${name} = :${name}`);
-// }
-
-function response(code, body) {
+function response(statusCode, body) {
   return {
-    statusCode: code,
-    body: JSON.stringify(body)
+    statusCode,
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : null
   };
 }
+
+// Export the Lambda handler
+module.exports = { handler };

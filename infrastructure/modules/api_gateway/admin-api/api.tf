@@ -5,7 +5,7 @@ resource "aws_api_gateway_rest_api" "api" {
 }
 
 resource "aws_api_gateway_deployment" "this" {
-    depends_on = [aws_api_gateway_integration.admin_lambda, aws_api_gateway_integration.media_upload_lambda]
+    depends_on = [aws_api_gateway_integration.admin_lambda, aws_api_gateway_integration.media_upload_lambda, aws_api_gateway_integration.leads_lambda,]
     rest_api_id = aws_api_gateway_rest_api.api.id
   # Force new deployment if Lambda changes
   triggers = {
@@ -13,6 +13,10 @@ resource "aws_api_gateway_deployment" "this" {
     lambda_version_media = var.media_lambda_version
     lambda_version_leads = var.leads_lambda_version
   }
+  lifecycle {
+    create_before_destroy = true
+  }
+
 }
 
 resource "aws_api_gateway_stage" "prod" {

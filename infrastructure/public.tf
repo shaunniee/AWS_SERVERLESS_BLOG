@@ -8,14 +8,14 @@ module "public_read_lambda" {
     filename      = "services/public_read_lambda/public.zip"
     tags          = var.tags
     environment_variables = {
-        POSTS_TABLE= module.posts_table.table_name
+        POSTS_TABLE= module.posts_table_v2.table_name
     }
 }
 
 # Public lambda dynamoDb posts table read only policy + attachement
 module "public_lambda_dynamodb_policy" {
     source = "./modules/iam/public-lambda-dynamodb-policy"
-    table_arn = module.posts_table.table_arn
+    table_arn = module.posts_table_v2.table_arn
 }
 
 resource "aws_iam_role_policy_attachment" "public_lambda_dynamodb_policy_attachment" {

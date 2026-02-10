@@ -40,11 +40,12 @@ resource "aws_dynamodb_table" "this" {
   })
 
   lifecycle {
-    prevent_destroy = true
-     # ignore all changes to GSIs
+    prevent_destroy = false
+    #  ignore all changes to GSIs
     ignore_changes = [
       global_secondary_index
     ]
+
   }
 
 }

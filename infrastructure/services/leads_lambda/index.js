@@ -1,0 +1,73 @@
+const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
+const { randomUUID } = require("crypto");
+
+const client = new DynamoDBClient({});
+const ddb = DynamoDBDocumentClient.from(client);
+
+const TABLE = process.env.LEADS_TABLE;
+const now = () => new Date().toISOString();
+
+exports.handler = async (event) => {
+  try {
+    const method = event.httpMethod;
+    const path = event.resource; // API Gateway resource path
+    const leadId = event.pathParameters?.leadId;
+    const body = event.body ? JSON.parse(event.body) : {};
+
+    // Routes
+    if (method === "POST" && path === "/leads") {
+      return createLead(body);
+    }
+
+    if (method === "GET" && path === "/admin/leads") {
+      return listLeads();
+    }
+
+    return response(404, { message: "Route not found" });
+
+  } catch (err) {
+    console.error("Error in leads Lambda:", err);
+    return response(500, { message: err.message });
+  }
+};
+
+// Create a new lead
+async function createLead(data) {
+  const lead = {
+    leadID: randomUUID(),
+    name: data.name,
+    email: data.email,
+    message: data.message,
+    status: "NEW",
+    createdAt: now()
+  };
+
+  await ddb.send(new PutCommand({
+    TableName: TABLE,
+    Item: lead
+  }));
+
+  return response(201, lead);
+}
+
+// List all leads (simple scan for learning project)
+const { ScanCommand } = require("@aws-sdk/lib-dynamodb");
+
+async function listLeads() {
+  const result = await ddb.send(new ScanCommand({
+    TableName: TABLE
+  }));
+
+  return response(200, result.Items || []);
+}
+
+
+// Standard JSON response
+function response(statusCode, body) {
+  return {
+    statusCode,
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : null
+  };
+}

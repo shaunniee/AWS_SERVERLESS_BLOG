@@ -1,5 +1,5 @@
-resource "aws_iam_policy" "posts_dynamodb_policy" {
-  name = "posts-dynamodb-policy"
+resource "aws_iam_policy" "posts_dynamodb_policy_leads_read_write" {
+  name = "posts-dynamodb-policy-leads-read-write"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -8,7 +8,8 @@ resource "aws_iam_policy" "posts_dynamodb_policy" {
       Action = [
         "dynamodb:GetItem",
         "dynamodb:PutItem",
-        "dynamodb:Query"
+        "dynamodb:Query",
+        "dynamodb:Scan",
       ]
       Resource = [
         var.table_arn,
@@ -20,5 +21,5 @@ resource "aws_iam_policy" "posts_dynamodb_policy" {
 
 output "policy_arn" {
   description = "The ARN of the IAM policy for DynamoDB access"
-  value       = aws_iam_policy.posts_dynamodb_policy.arn
+  value       = aws_iam_policy.posts_dynamodb_policy_leads_read_write.arn
 }

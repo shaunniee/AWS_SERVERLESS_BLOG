@@ -7,7 +7,7 @@ module "posts_table" {
   table_name = "posts"
   hash_key   = "postID"
   hash_key_type = "S"
-  range_key  = "createdAt"
+  range_key = "createdAt"
   attributes = [
     {
       name = "postID"
@@ -58,17 +58,16 @@ module "leads_table" {
   table_name   = "leads"
   hash_key     = "leadID"
   hash_key_type = "S"
-  range_key    = "createdAt"
   billing_mode = "PAY_PER_REQUEST"
+  range_key = "createdAt"
   attributes = [
     {
       name = "leadID"
       type = "S"
-    },
-    {
+    },{
       name = "createdAt"
       type = "N"
-  }]
+    }]
 
   tags = var.tags
 }
@@ -104,14 +103,14 @@ module "leads_lambda" {
     filename      = "services/leads_lambda/leads.zip"
     tags          = var.tags
     environment_variables = {
-        LEADS_TABLE= module.leads_table.table_name
+        LEADS_TABLE= module.leads_table_v2.table_name
     }
 }
 
 # Define IAM policy for leads lambda to access the leads DynamoDB table with read/write permissions
 module "leads_lambda_dynamodb_policy" {
     source = "./modules/iam/dynamodb-leads-read_write-policy"
-    table_arn = module.leads_table.table_arn
+    table_arn = module.leads_table_v2.table_arn
 }
 
 # Attach the IAM policy to the leads lambda execution role
@@ -129,7 +128,76 @@ module "leads_lambda_invoke_permission_public_api" {
 }
 
 module "leads_lambda_invoke_permission_admin_api" {
-    source = "./modules/iam/api-gateway-admin-lambda-invoke"
+    source = "./modules/iam/api-gateway-admin-lambda-invoke-leads"
     lambda_function_name = module.leads_lambda.lambda_function_name
     api_gateway_endpoint = module.admin_api_gateway.api_gateway_execution_arn
+}
+
+
+
+
+module "posts_table_v2" {
+  source     = "./modules/data/database"
+  name_prefix = var.name_prefix
+  table_name = "posts_v2"
+  hash_key   = "postID"
+  hash_key_type = "S"
+  attributes = [
+    {
+      name = "postID"
+      type = "S"
+    },
+    {
+      name = "createdAt"
+      type = "N"
+    },
+    {
+      name = "authorID"
+      type = "S"
+    },
+    {
+      name = "publishedAt"
+      type = "N"
+    },
+    {
+      name = "status"
+      type = "S"
+    }
+  ]
+
+  gsi = [
+    {
+      name            = "authorIDIndex"
+      hash_key        = "authorID"
+      range_key       = "createdAt"
+      projection_type = "ALL"
+    },
+    {
+      name            = "publishedAtIndex"
+      hash_key        = "status"
+      range_key       = "publishedAt"
+      projection_type = "ALL"
+    }
+  ]
+
+  billing_mode = "PAY_PER_REQUEST"
+  tags         = var.tags
+
+}
+
+# Define dynamoDb Leads table
+module "leads_table_v2" {
+  source       = "./modules/data/database"
+  name_prefix = var.name_prefix
+  table_name   = "leads_v2"
+  hash_key     = "leadID"
+  hash_key_type = "S"
+  billing_mode = "PAY_PER_REQUEST"
+  attributes = [
+    {
+      name = "leadID"
+      type = "S"
+    }]
+
+  tags = var.tags
 }

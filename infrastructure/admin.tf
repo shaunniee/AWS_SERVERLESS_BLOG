@@ -8,7 +8,7 @@ module "admin_posts_lambda" {
     filename      = "services/admin_posts/posts.zip"
     tags          = var.tags
     environment_variables = {
-        POSTS_TABLE= module.posts_table.table_name
+        POSTS_TABLE= module.posts_table_v2.table_name
     }
 }
 
@@ -27,7 +27,7 @@ module "admin_media_presign_lambda" {
 # create iam policy for admin lambda to post,update,get and delete posts from the posts table
 module "dynamodb_admin_policy" {
     source = "./modules/iam/dynamodb-post-policy"
-    table_arn  = module.posts_table.table_arn  
+    table_arn  = module.posts_table_v2.table_arn  
 }
 
 # attach the policy to the adminlambda role

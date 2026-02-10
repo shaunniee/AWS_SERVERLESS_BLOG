@@ -2,10 +2,7 @@
 locals {
   admin_lambda_methods = {
     "posts" = ["POST", "GET"]
-    "post_id" = ["GET", "PUT", "PATCH", "DELETE"]
-    "post_publish" = ["POST"]
-    "post_unpublish" = ["POST"]
-    "post_archive" = ["POST"]
+    "post_id" = ["GET", "PUT","DELETE"]
   }
 }
 resource "aws_api_gateway_integration" "admin_lambda" {
@@ -57,3 +54,42 @@ resource "aws_api_gateway_integration" "leads_lambda" {
     aws_api_gateway_method.admin_leads_get
   ]
 }
+
+# Integrate POAST /admin/posts/{postId}/publish with Lambda
+resource "aws_api_gateway_integration" "publish_lambda" {
+  rest_api_id             = aws_api_gateway_rest_api.api.id
+  resource_id             = aws_api_gateway_resource.admin_post_publish.id
+  http_method             = aws_api_gateway_method.admin_post_publish_post.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.admin_lambda_arn
+  depends_on = [
+    aws_api_gateway_method.admin_post_publish_post
+  ]
+}
+
+# Integrate POAST /admin/posts/{postId}/unpublish with Lambda
+resource "aws_api_gateway_integration" "unpublish_lambda" {
+  rest_api_id             = aws_api_gateway_rest_api.api.id
+  resource_id             = aws_api_gateway_resource.admin_post_unpublish.id
+  http_method             = aws_api_gateway_method.admin_post_unpublish_post.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.admin_lambda_arn
+  depends_on = [
+    aws_api_gateway_method.admin_post_unpublish_post
+  ]
+}
+
+# Integrate POST /admin/posts/{postId}/archive with Lambda
+resource "aws_api_gateway_integration" "archive_lambda" {
+  rest_api_id             = aws_api_gateway_rest_api.api.id
+  resource_id             = aws_api_gateway_resource.admin_post_archive.id
+  http_method             = aws_api_gateway_method.admin_post_archive_post.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.admin_lambda_arn
+  depends_on = [
+    aws_api_gateway_method.admin_post_archive_post
+  ]
+}    

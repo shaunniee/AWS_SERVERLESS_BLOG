@@ -148,3 +148,25 @@ resource "aws_iam_role_policy_attachment" "notification_lambda_ses_allow_policy_
     role       = module.admin_notifications_lambda.lambda_role_name
     policy_arn = module.notification_lambda_ses_allow_policy.policy_arn
 }
+
+
+# Create a DLQ for notifications lambda
+
+module "notifications_dlq" {
+  source = "./modules/sqs"
+  name       = "notifications-dlq"
+  create_dlq = false
+}
+
+# create policy for notifications lambda to send messages to DLQ
+
+module "notification_lambda_dlq_policy" {
+    source = "./modules/iam/notifications-lambda-sqs-dql-policy"
+    notifications_dlq_arn = module.notifications_dlq.queue_arn
+}
+
+# attach the policy to the notifications lambda role
+resource "aws_iam_role_policy_attachment" "notification_lambda_dlq_policy_attachment" {
+    role       = module.admin_notifications_lambda.lambda_role_name
+    policy_arn = module.notification_lambda_dlq_policy.policy_arn
+}

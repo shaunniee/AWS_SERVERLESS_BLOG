@@ -133,6 +133,18 @@ module "leads_lambda_invoke_permission_admin_api" {
     api_gateway_endpoint = module.admin_api_gateway.api_gateway_execution_arn
 }
 
+# leads lambda send event policy
+
+module "leads_lambda_eventbridge_policy" {
+    source = "./modules/iam/leads-lambda-event-policy"
+    event_bus_arn = module.leads_event.event_bus_arn
+}
+
+# attach the policy to the leads lambda role
+resource "aws_iam_role_policy_attachment" "leads_lambda_eventbridge_policy_attachment" {
+    role       = module.leads_lambda.lambda_role_name
+    policy_arn = module.leads_lambda_eventbridge_policy.policy_arn
+}
 
 
 

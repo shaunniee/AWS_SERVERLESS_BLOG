@@ -16,3 +16,8 @@ output "lambda_version" {
     description = "The version of the Lambda function, used to trigger API Gateway deployments"
     value       = aws_lambda_function.this.version
 }
+
+output "lambda_arn"{
+    description = "The ARN of the Lambda function"
+    value       = aws_lambda_function.this.arn
+}

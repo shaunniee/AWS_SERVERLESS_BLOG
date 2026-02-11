@@ -3,51 +3,62 @@ const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { randomUUID } = require("crypto");
 
 const s3 = new S3Client({});
+
 const BUCKET = process.env.MEDIA_BUCKET;
+const EXPIRY = Number(process.env.UPLOAD_EXPIRY_SECONDS || 300);
 
 exports.handler = async (event) => {
-  console.log("S3 presign lambda invoked with event:", JSON.stringify(event));
-//   try {
-//     const body = JSON.parse(event.body || "{}");
+  try {
+    const method = event.httpMethod;
+    const path = event.resource;
+    const body = event.body ? JSON.parse(event.body) : {};
 
-//     if (!body.postId || !body.contentType) {
-//       return response(400, "postId and contentType are required");
-//     }
+    // Only allow admin upload route
+    if (method !== "POST" || path !== "/admin/media/upload_url") {
+      return response(404, { message: "Route not found" });
+    }
 
-//     // Optional safety check
-//     if (!body.contentType.startsWith("image/")) {
-//       return response(400, "Only image uploads are allowed");
-//     }
+    const {
+      contentType,
+      extension = "jpg",
+      folder = "media"
+    } = body;
 
-//     const extension = body.contentType.split("/")[1];
-//     const key = `posts/${body.postId}/${randomUUID()}.${extension}`;
+    if (!contentType) {
+      return response(400, { message: "contentType is required" });
+    }
 
-//     const command = new PutObjectCommand({
-//       Bucket: BUCKET,
-//       Key: key,
-//       ContentType: body.contentType
-//     });
+    const objectKey = `${folder}/${randomUUID()}.${extension}`;
 
-//     const uploadUrl = await getSignedUrl(s3, command, {
-//       expiresIn: 300 // 5 minutes
-//     });
+    const command = new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: objectKey,
+      ContentType: contentType,
+      ACL: "private"
+    });
 
-//     return {
-//       statusCode: 200,
-//       body: JSON.stringify({
-//         uploadUrl,
-//         key
-//       })
-//     };
-//   } catch (err) {
-//     console.error(err);
-//     return response(500, "Failed to generate upload URL");
-//   }
-// };
+    const uploadUrl = await getSignedUrl(s3, command, {
+      expiresIn: EXPIRY
+    });
 
-// function response(statusCode, message) {
-//   return {
-//     statusCode,
-//     body: JSON.stringify({ message })
-//   };
+    return response(200, {
+      uploadUrl,
+      key: objectKey,
+      expiresIn: EXPIRY
+    });
+
+  } catch (err) {
+    console.error("Presign upload error:", err);
+    return response(500, { message: err.message });
+  }
+};
+
+function response(statusCode, body) {
+  return {
+    statusCode,
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  };
 }

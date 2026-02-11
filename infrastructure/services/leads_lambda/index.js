@@ -1,5 +1,9 @@
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
+const { EventBridgeClient, PutEventsCommand } = require("@aws-sdk/client-eventbridge");
+
+const eb = new EventBridgeClient({});
+
 const { randomUUID } = require("crypto");
 
 const client = new DynamoDBClient({});
@@ -47,6 +51,8 @@ async function createLead(data) {
     TableName: TABLE,
     Item: lead
   }));
+  
+  await emitLeadCreatedEvent(lead);
 
   return response(201, lead);
 }
@@ -61,6 +67,24 @@ async function listLeads() {
 
   return response(200, result.Items || []);
 }
+
+async function emitLeadCreatedEvent(lead) {
+  await eb.send(new PutEventsCommand({
+    Entries: [
+      {
+        Source: "app.leads",
+        DetailType: "LeadCreated",
+        Detail: JSON.stringify({
+          leadID: lead.leadID,
+          name: lead.name,
+          email: lead.email,
+          message: lead.message
+        })
+      }
+    ]
+  }));
+}
+
 
 
 // Standard JSON response

@@ -132,14 +132,14 @@ Public Lambdas cannot mutate posts.
 
 Routes:
 
-* `POST /posts`
-* `PUT /posts/{postId}`
-* `DELETE /posts/{postId}`
-* `POST /posts/{postId}/publish`
-* `POST /posts/{postId}/unpublish`
-* `POST /posts/{postId}/archive`
-* `GET /leads`
-* `POST /media/presign`
+* `POST /admin/posts`
+* `PUT /admin/posts/{postId}`
+* `DELETE /admin/posts/{postId}`
+* `POST /admin/posts/{postId}/publish`
+* `POST /admin/posts/{postId}/unpublish`
+* `POST /admin/posts/{postId}/archive`
+* `GET /admin/leads`
+* `POST /media/media_url`
 
 Only authenticated admins can access these endpoints.
 
@@ -221,7 +221,7 @@ This keeps uploads fast and secure.
 
 ---
 
-## 🔄 Event-Driven Flows (Examples)
+## 🔄 Event-Driven Flows
 
 ### User visits the blog
 

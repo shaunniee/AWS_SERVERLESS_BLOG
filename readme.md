@@ -72,28 +72,8 @@ This is how production serverless systems are actually built.
 
 ## 🖼 Architecture Diagram (How to draw it)
 
-If you’re recreating this visually (draw.io / Lucid):
 
-1. Two CloudFront distributions at the top:
-
-   * Public Frontend
-   * Admin Frontend
-2. Each connects to its own S3 bucket via OAC
-3. Public CloudFront routes to Public API Gateway
-4. Admin CloudFront routes to Admin API Gateway
-5. Admin API Gateway connects to Cognito
-6. API Gateways invoke role-specific Lambdas
-7. Lambdas interact with DynamoDB tables
-8. EventBridge fans out to:
-
-   * Notifications Lambda → SES → DLQ
-   * Cleanup Lambda
-9. Media uploads flow:
-
-   * Admin → Presign Lambda → Private S3 Media Bucket
-
-Public and admin paths never cross.
-
+![alt text](infrastructure/architecture_v2.drawio.png)
 ---
 
 ## 🔐 Authentication & Security Decisions

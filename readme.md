@@ -1,5 +1,23 @@
 # Serverless Blog Platform (Public Blog + Admin CMS)
 
+![AWS](https://img.shields.io/badge/AWS-Serverless-orange)
+![Terraform](https://img.shields.io/badge/IaC-Terraform-623CE4)
+![Lambda](https://img.shields.io/badge/Compute-AWS%20Lambda-yellow)
+![API Gateway](https://img.shields.io/badge/API-API%20Gateway-blue)
+![Auth](https://img.shields.io/badge/Auth-Amazon%20Cognito-green)
+![Database](https://img.shields.io/badge/Database-DynamoDB-4053D6)
+![Events](https://img.shields.io/badge/Messaging-EventBridge-purple)
+![Email](https://img.shields.io/badge/Email-SES-lightgrey)
+![Storage](https://img.shields.io/badge/Storage-S3-569A31)
+![CDN](https://img.shields.io/badge/CDN-CloudFront-8C4FFF)
+![Security](https://img.shields.io/badge/Security-IAM%20%7C%20KMS-red)
+![Status](https://img.shields.io/badge/Status-Production--Style-success)
+![Terraform](https://img.shields.io/badge/IaC-Terraform-623CE4)
+![Architecture](https://img.shields.io/badge/Architecture-Event--Driven-blue)
+![Auth](https://img.shields.io/badge/Auth-Amazon%20Cognito-green)
+![Database](https://img.shields.io/badge/Database-DynamoDB-4053D6)
+![Status](https://img.shields.io/badge/Status-Production--Style-success)
+
 A production-style serverless blog platform with a public-facing site and a fully isolated admin CMS.
 
 This system is designed to solve a real problem: serve public content safely at scale while giving admins full control, without ever exposing privileged access.
@@ -70,7 +88,7 @@ This is how production serverless systems are actually built.
 
 ---
 
-## 🖼 Architecture Diagram (How to draw it)
+## 🖼 Architecture Diagram
 
 
 ![alt text](infrastructure/architecture_v2.drawio.png)

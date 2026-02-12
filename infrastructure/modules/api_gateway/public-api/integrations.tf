@@ -45,6 +45,7 @@ resource "aws_api_gateway_integration_response" "public_options" {
   resource_id = each.value
   http_method = aws_api_gateway_method.public_options[each.key].http_method
   status_code = aws_api_gateway_method_response.public_options[each.key].status_code
+  depends_on  = [aws_api_gateway_integration.public_options]
 
   response_parameters = {
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"

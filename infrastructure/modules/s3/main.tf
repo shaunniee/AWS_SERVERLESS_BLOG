@@ -49,28 +49,27 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
 resource "aws_s3_bucket_lifecycle_configuration" "this" {
   count  = length(var.lifecycle_rules) > 0 ? 1 : 0
   bucket = var.prevent_destroy ? aws_s3_bucket.protected[0].id : aws_s3_bucket.unprotected[0].id
+
   dynamic "rule" {
     for_each = var.lifecycle_rules
     content {
       id     = rule.value.id
       status = lookup(rule.value, "status", "Enabled")
 
-    dynamic "filter" {
-  for_each = rule.value.filter != null ? [rule.value.filter] : []
+      dynamic "filter" {
+        for_each = rule.value.filter != null ? [rule.value.filter] : []
+        content {
+          prefix = try(filter.value.prefix, null)
 
-  content {
-    prefix = try(filter.value.prefix, null)
-
-    dynamic "tag" {
-      for_each = filter.value.tag != null ? [filter.value.tag] : []
-
-      content {
-        key   = tag.value.key
-        value = tag.value.value
+          dynamic "tag" {
+            for_each = filter.value.tag != null ? [filter.value.tag] : []
+            content {
+              key   = tag.value.key
+              value = tag.value.value
+            }
+          }
+        }
       }
-    }
-  }
-}
 
       # Transition block
       dynamic "transition" {
@@ -89,6 +88,22 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
           expired_object_delete_marker = lookup(expiration.value, "expired_object_delete_marker", null)
         }
       }
+    }
+  }
+}
+
+resource "aws_s3_bucket_cors_configuration" "this" {
+  count  = length(var.cors_rules) > 0 ? 1 : 0
+  bucket = var.prevent_destroy ? aws_s3_bucket.protected[0].id : aws_s3_bucket.unprotected[0].id
+
+  dynamic "cors_rule" {
+    for_each = var.cors_rules
+    content {
+      allowed_headers = cors_rule.value.allowed_headers
+      allowed_methods = cors_rule.value.allowed_methods
+      allowed_origins = cors_rule.value.allowed_origins
+      expose_headers  = lookup(cors_rule.value, "expose_headers", [])
+      max_age_seconds = lookup(cors_rule.value, "max_age_seconds", 3000)
     }
   }
 }

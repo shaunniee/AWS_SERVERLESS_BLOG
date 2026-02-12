@@ -90,6 +90,13 @@ module "media_bucket" {
             storage_class = "STANDARD_IA"
         }]
     }]
+    cors_rules = [{
+        allowed_headers = ["*"]
+        allowed_methods = ["PUT", "GET", "HEAD"]
+        allowed_origins = ["*"]
+        expose_headers  = ["ETag"]
+        max_age_seconds = 3000
+    }]
     tags        = var.tags
 }
 

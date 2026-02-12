@@ -1,9 +1,12 @@
+import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { usePost, usePublishPost, useUnpublishPost } from '@/hooks/usePosts';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PostStatusBadge } from '@/components/posts/PostStatusBadge';
 import { toast } from 'sonner';
+import { MEDIA_CDN_URL } from '@/utils/constants';
+import { resolveMediaSrc } from '@/utils/media';
 
 export const PostViewPage = () => {
   const { postId } = useParams<{ postId: string }>();
@@ -11,10 +14,56 @@ export const PostViewPage = () => {
   const { data: post, isLoading, error } = usePost(postId!);
   const publishPost = usePublishPost();
   const unpublishPost = useUnpublishPost();
+  const [mainImageFailed, setMainImageFailed] = useState(false);
 
   const canEdit = post?.status === 'DRAFT' || post?.status === 'UNPUBLISHED';
   const canPublish = post?.status === 'DRAFT' || post?.status === 'UNPUBLISHED';
   const canUnpublish = post?.status === 'PUBLISHED';
+  const mainImageSrc = post?.mainImageKey ? resolveMediaSrc(post.mainImageKey) : '';
+
+  const renderedContent = useMemo(() => {
+    if (!post?.content) return '';
+
+    if (typeof window === 'undefined') {
+      return post.content;
+    }
+
+    const parser = new window.DOMParser();
+    const doc = parser.parseFromString(post.content, 'text/html');
+    const images = Array.from(doc.querySelectorAll('img'));
+
+    images.forEach((img) => {
+      const source = (img.getAttribute('src') || '').trim();
+      const isAbsolute = source.startsWith('http://') || source.startsWith('https://') || source.startsWith('data:');
+      const hasCdn = Boolean(MEDIA_CDN_URL);
+
+      if (!source) {
+        img.replaceWith(createImagePlaceholder(doc, 'Image unavailable'));
+        return;
+      }
+
+      if (!isAbsolute && hasCdn) {
+        img.setAttribute('src', resolveMediaSrc(source));
+        img.setAttribute(
+          'onerror',
+          "this.outerHTML='<div class=\"rounded-lg border border-dashed border-gray-400/60 bg-gray-100 p-4 text-sm\"><div class=\"font-medium\">Image placeholder</div><div class=\"mt-1 font-mono text-xs break-all\">Image failed to load</div></div>'"
+        );
+        return;
+      }
+
+      if (!isAbsolute && !hasCdn) {
+        img.replaceWith(createImagePlaceholder(doc, source));
+        return;
+      }
+
+      img.setAttribute(
+        'onerror',
+        "this.outerHTML='<div class=\"rounded-lg border border-dashed border-gray-400/60 bg-gray-100 p-4 text-sm\"><div class=\"font-medium\">Image placeholder</div><div class=\"mt-1 font-mono text-xs break-all\">Image failed to load</div></div>'"
+      );
+    });
+
+    return doc.body.innerHTML;
+  }, [post?.content]);
 
   const handlePublish = async () => {
     if (!postId) return;
@@ -101,14 +150,41 @@ export const PostViewPage = () => {
         </div>
       </div>
 
+      {post.mainImageKey && (
+        <Card className="border-white/90 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.8)]">
+          <CardContent className="p-6">
+            {MEDIA_CDN_URL && !mainImageFailed ? (
+              <img
+                src={mainImageSrc}
+                alt={post.title}
+                className="h-auto w-full rounded-lg object-cover"
+                onError={() => setMainImageFailed(true)}
+              />
+            ) : (
+              <div className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/40 p-8 text-center">
+                <p className="font-medium text-foreground">Main image placeholder</p>
+                <p className="mt-1 font-mono text-xs text-muted-foreground break-all">{post.mainImageKey}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="border-white/90 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.8)]">
         <CardContent className="p-6">
           <article
             className="prose prose-slate max-w-none"
-            dangerouslySetInnerHTML={{ __html: post.content }}
+            dangerouslySetInnerHTML={{ __html: renderedContent }}
           />
         </CardContent>
       </Card>
     </div>
   );
+};
+
+const createImagePlaceholder = (doc: Document, key: string): HTMLDivElement => {
+  const wrapper = doc.createElement('div');
+  wrapper.className = 'rounded-lg border border-dashed border-muted-foreground/40 bg-muted/40 p-4 text-sm';
+  wrapper.innerHTML = `<div class="font-medium">Image placeholder</div><div class="mt-1 font-mono text-xs break-all">${key}</div>`;
+  return wrapper;
 };

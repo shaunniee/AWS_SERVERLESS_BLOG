@@ -12,10 +12,15 @@ export const useMediaUpload = () => {
 
     try {
       // Step 1: Get presigned URL from backend
-      const { uploadUrl, objectKey } = await mediaApi.getPresignedUrl(
+      const { uploadUrl, objectKey, key } = await mediaApi.getPresignedUrl(
         file.name,
         file.type
       );
+      const resolvedObjectKey = objectKey || key;
+
+      if (!uploadUrl || !resolvedObjectKey) {
+        throw new Error('Invalid presigned URL response from server');
+      }
 
       // Step 2: Upload file directly to S3 using presigned URL
       await axios.put(uploadUrl, file, {
@@ -40,7 +45,7 @@ export const useMediaUpload = () => {
       setUploading(false);
       setProgress(100);
 
-      return objectKey;
+      return resolvedObjectKey;
     } catch (error) {
       setUploading(false);
       setProgress(0);

@@ -16,6 +16,34 @@ const TABLE = process.env.POSTS_TABLE;
 
 const now = () => Date.now();
 
+const normalizeObjectKey = (value = "") => String(value).replace(/^\/+/, "").trim();
+
+const extractMediaKeysFromContent = (content = "") => {
+  const regex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  const keys = [];
+  let match;
+
+  while ((match = regex.exec(content)) !== null) {
+    const src = normalizeObjectKey(match[1] || "");
+    const isAbsolute = src.startsWith("http://") || src.startsWith("https://") || src.startsWith("data:");
+    if (src && !isAbsolute) {
+      keys.push(src);
+    }
+  }
+
+  return keys;
+};
+
+const buildMediaKeys = (data = {}) => {
+  const inlineKeys = extractMediaKeysFromContent(data.content || "");
+  const providedKeys = Array.isArray(data.mediaKeys)
+    ? data.mediaKeys.map((value) => normalizeObjectKey(value)).filter(Boolean)
+    : [];
+  const mainImageKey = normalizeObjectKey(data.mainImageKey || "");
+
+  return Array.from(new Set([...providedKeys, ...inlineKeys, ...(mainImageKey ? [mainImageKey] : [])]));
+};
+
 async function handler(event) {
   try {
     const method = event.httpMethod;
@@ -42,11 +70,16 @@ async function handler(event) {
 }
 
 async function createPost(data, authorID) {
+  const mainImageKey = normalizeObjectKey(data.mainImageKey || "");
+  const mediaKeys = buildMediaKeys(data);
+
   const post = {
     postID: randomUUID(),
     authorID: authorID,
     title: data.title,
     content: data.content,
+    mainImageKey: mainImageKey || null,
+    mediaKeys,
     status: "DRAFT",
     createdAt: now(),
     updatedAt: now(),
@@ -80,12 +113,17 @@ async function getPost(postId) {
 }
 
 async function updatePost(postId, data) {
+  const mainImageKey = normalizeObjectKey(data.mainImageKey || "");
+  const mediaKeys = buildMediaKeys(data);
+
   await ddb.send(new UpdateCommand({
   TableName: TABLE,
   Key: { postID: postId },
   UpdateExpression: `
     SET title = :t,
         content = :c,
+        mainImageKey = :m,
+        mediaKeys = :k,
         updatedAt = :u
   `,
   ConditionExpression: "#s IN (:draft, :unpublished)",
@@ -95,6 +133,8 @@ async function updatePost(postId, data) {
   ExpressionAttributeValues: {
     ":t": data.title,
     ":c": data.content,
+    ":m": mainImageKey || null,
+    ":k": mediaKeys,
     ":u": now(),
     ":draft": "DRAFT",
     ":unpublished": "UNPUBLISHED"
@@ -159,7 +199,7 @@ async function archivePost(postId) {
 }
 
 async function deletePost(postId) {
-  await ddb.send(new DeleteCommand({ TableName: TABLE, Key: { postId } }));
+  await ddb.send(new DeleteCommand({ TableName: TABLE, Key: { postID: postId } }));
   return response(204);
 }
 

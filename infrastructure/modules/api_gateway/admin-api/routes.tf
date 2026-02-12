@@ -8,6 +8,13 @@ resource "aws_api_gateway_resource" "admin" {
   parent_id   = data.aws_api_gateway_resource.root.id
   path_part   = "admin"
 }
+
+# Catch-all proxy under /admin for robust OPTIONS preflight handling
+resource "aws_api_gateway_resource" "admin_proxy" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  parent_id   = aws_api_gateway_resource.admin.id
+  path_part   = "{proxy+}"
+}
 # Define the /admin/posts resource
 resource "aws_api_gateway_resource" "admin_posts" {
   rest_api_id = aws_api_gateway_rest_api.api.id
@@ -135,6 +142,8 @@ resource "aws_api_gateway_method" "admin_media_upload_post" {
 
 locals {
   cors_resource_ids = {
+    admin                = aws_api_gateway_resource.admin.id
+    admin_proxy          = aws_api_gateway_resource.admin_proxy.id
     admin_posts          = aws_api_gateway_resource.admin_posts.id
     admin_post_id        = aws_api_gateway_resource.admin_post_id.id
     admin_post_publish   = aws_api_gateway_resource.admin_post_publish.id

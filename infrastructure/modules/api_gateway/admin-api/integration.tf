@@ -112,6 +112,7 @@ resource "aws_api_gateway_integration_response" "admin_options" {
   resource_id = each.value
   http_method = aws_api_gateway_method.admin_options[each.key].http_method
   status_code = aws_api_gateway_method_response.admin_options[each.key].status_code
+  depends_on  = [aws_api_gateway_integration.admin_options]
 
   response_parameters = {
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"

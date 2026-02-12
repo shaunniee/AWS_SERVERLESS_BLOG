@@ -5,6 +5,8 @@ export interface Post {
   authorID: string;
   title: string;
   content: string;
+  mainImageKey?: string | null;
+  mediaKeys?: string[];
   status: PostStatus;
   createdAt: number;
   updatedAt: number;
@@ -14,9 +16,13 @@ export interface Post {
 export interface CreatePostInput {
   title: string;
   content: string;
+  mainImageKey?: string;
+  mediaKeys?: string[];
 }
 
 export interface UpdatePostInput {
   title: string;
   content: string;
+  mainImageKey?: string;
+  mediaKeys?: string[];
 }

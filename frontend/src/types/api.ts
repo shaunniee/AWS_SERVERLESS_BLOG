@@ -6,5 +6,6 @@ export interface ApiError {
 export interface PresignedUrlResponse {
   uploadUrl: string;
   objectKey: string;
+  key?: string;
   expiresIn: number;
 }

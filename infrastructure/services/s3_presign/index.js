@@ -7,6 +7,18 @@ const s3 = new S3Client({});
 const BUCKET = process.env.MEDIA_BUCKET;
 const EXPIRY = Number(process.env.UPLOAD_EXPIRY_SECONDS || 300);
 
+const getExtension = (fileName = "", contentType = "") => {
+  const fromName = String(fileName).split(".").pop();
+  if (fromName && fromName !== fileName) return fromName.toLowerCase();
+
+  if (contentType.includes("/")) {
+    const fromType = contentType.split("/")[1];
+    if (fromType) return fromType.toLowerCase();
+  }
+
+  return "jpg";
+};
+
 exports.handler = async (event) => {
   try {
     const method = event.httpMethod;
@@ -19,8 +31,8 @@ exports.handler = async (event) => {
     }
 
     const {
+      fileName,
       contentType,
-      extension = "jpg",
       folder = "media"
     } = body;
 
@@ -28,13 +40,13 @@ exports.handler = async (event) => {
       return response(400, { message: "contentType is required" });
     }
 
+    const extension = getExtension(fileName, contentType);
     const objectKey = `${folder}/${randomUUID()}.${extension}`;
 
     const command = new PutObjectCommand({
       Bucket: BUCKET,
       Key: objectKey,
-      ContentType: contentType,
-      ACL: "private"
+      ContentType: contentType
     });
 
     const uploadUrl = await getSignedUrl(s3, command, {
@@ -43,6 +55,7 @@ exports.handler = async (event) => {
 
     return response(200, {
       uploadUrl,
+      objectKey,
       key: objectKey,
       expiresIn: EXPIRY
     });

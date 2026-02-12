@@ -10,6 +10,13 @@ resource "aws_api_gateway_resource" "posts" {
   path_part   = "posts"
 }
 
+# Catch-all proxy to ensure OPTIONS preflight always resolves
+resource "aws_api_gateway_resource" "proxy" {
+  rest_api_id = aws_api_gateway_rest_api.public_api.id
+  parent_id   = data.aws_api_gateway_resource.root.id
+  path_part   = "{proxy+}"
+}
+
 # Define the /posts/{postId} resource
 resource "aws_api_gateway_resource" "post_id" {
   rest_api_id = aws_api_gateway_rest_api.public_api.id
@@ -50,6 +57,7 @@ resource "aws_api_gateway_method" "leads_post" {
 
 locals {
   cors_resource_ids = {
+    proxy   = aws_api_gateway_resource.proxy.id
     posts   = aws_api_gateway_resource.posts.id
     post_id = aws_api_gateway_resource.post_id.id
     leads   = aws_api_gateway_resource.leads.id

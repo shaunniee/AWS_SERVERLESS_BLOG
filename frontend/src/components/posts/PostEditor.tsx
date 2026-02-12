@@ -6,13 +6,15 @@ import Link from '@tiptap/extension-link';
 import { Button } from '@/components/ui/button';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { Bold, Italic, List, ListOrdered, Heading2, Link as LinkIcon, ImageIcon } from 'lucide-react';
+import { resolveMediaSrc } from '@/utils/media';
 
 interface PostEditorProps {
   content: string;
   onChange: (content: string) => void;
+  onImageUpload?: (objectKey: string) => void;
 }
 
-export const PostEditor = ({ content, onChange }: PostEditorProps) => {
+export const PostEditor = ({ content, onChange, onImageUpload }: PostEditorProps) => {
   const [showMediaUploader, setShowMediaUploader] = useState(false);
 
   const editor = useEditor({
@@ -37,12 +39,11 @@ export const PostEditor = ({ content, onChange }: PostEditorProps) => {
     },
   });
 
-  const handleImageUpload = (url: string) => {
+  const handleImageUpload = (objectKey: string) => {
     if (editor) {
-      // Insert image at current cursor position
-      // Note: The URL here is the S3 object key
-      // TODO: If you have CloudFront configured, use full URL instead
-      editor.chain().focus().setImage({ src: url }).run();
+      // Save object key in content; convert to full URL only when CDN is configured.
+      editor.chain().focus().setImage({ src: resolveMediaSrc(objectKey) || objectKey }).run();
+      onImageUpload?.(objectKey);
     }
   };
 

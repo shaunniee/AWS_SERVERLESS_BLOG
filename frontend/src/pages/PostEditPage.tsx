@@ -76,6 +76,8 @@ export const PostEditPage = () => {
         defaultValues={{
           title: post.title,
           content: post.content,
+          mainImageKey: post.mainImageKey || '',
+          mediaKeys: post.mediaKeys || [],
         }}
         onSubmit={handleSubmit}
         isSubmitting={updatePost.isPending}

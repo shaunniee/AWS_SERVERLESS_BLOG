@@ -104,6 +104,7 @@ module "leads_lambda" {
     tags          = var.tags
     environment_variables = {
         LEADS_TABLE= module.leads_table_v2.table_name
+        LEADS_EVENT_BUS = "${var.name_prefix}-leads-bus"
     }
 }
 
@@ -137,7 +138,7 @@ module "leads_lambda_invoke_permission_admin_api" {
 
 module "leads_lambda_eventbridge_policy" {
     source = "./modules/iam/leads-lambda-event-policy"
-    event_bus_arn = module.leads_event.event_bus_arn
+    event_bus_arn = module.leads_event.event_bus_arn["${var.name_prefix}-leads-bus"]
 }
 
 # attach the policy to the leads lambda role

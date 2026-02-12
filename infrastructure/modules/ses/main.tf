@@ -3,8 +3,10 @@ resource "aws_ses_email_identity" "this" {
 }
 
 resource "aws_ses_template" "this" {
-    name         = var.template.name
-    subject = var.template.subject
-    text    = lookup(var.template, "text_part", null)
-    html    = lookup(var.template, file("html_part"), null)
+  count = var.template != null ? 1 : 0
+
+  name    = try(var.template.name, "")
+  subject = try(var.template.subject, "")
+  text    = try(var.template.text_part, null)
+  html    = try(var.template.html_part, null)
 }

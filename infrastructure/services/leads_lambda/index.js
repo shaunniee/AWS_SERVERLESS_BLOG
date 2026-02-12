@@ -10,6 +10,7 @@ const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
 
 const TABLE = process.env.LEADS_TABLE;
+const EVENT_BUS = process.env.LEADS_EVENT_BUS;
 const now = () => new Date().toISOString();
 
 exports.handler = async (event) => {
@@ -74,6 +75,7 @@ async function emitLeadCreatedEvent(lead) {
       {
         Source: "app.leads",
         DetailType: "LeadCreated",
+        EventBusName: EVENT_BUS,
         Detail: JSON.stringify({
           leadID: lead.leadID,
           name: lead.name,

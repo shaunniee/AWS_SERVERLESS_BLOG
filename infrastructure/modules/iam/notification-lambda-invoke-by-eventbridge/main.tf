@@ -4,4 +4,5 @@ resource "aws_lambda_permission" "allow_eventbridge" {
   function_name = var.lambda_function_name
   principal     = "events.amazonaws.com"
   source_arn    = var.source_arn
+  
 }

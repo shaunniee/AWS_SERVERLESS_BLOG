@@ -8,7 +8,7 @@ resource "aws_iam_policy" "leads_lambda_event_policy" {
             Action = [
                 "events:PutEvents"
             ]
-            Resource = var.event_bus_arn
+            Resource = ["*"]
         }]
     })
 

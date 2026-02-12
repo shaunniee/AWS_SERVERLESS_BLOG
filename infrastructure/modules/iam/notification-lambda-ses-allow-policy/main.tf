@@ -16,3 +16,7 @@ resource "aws_iam_policy" "notification_lambda_ses_allow_policy" {
     })
   
 }
+
+output "policy_arn" {
+value = aws_iam_policy.notification_lambda_ses_allow_policy.arn
+}

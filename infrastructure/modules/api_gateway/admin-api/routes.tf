@@ -1,6 +1,6 @@
 data "aws_api_gateway_resource" "root" {
-    rest_api_id = aws_api_gateway_rest_api.api.id
-    path        = "/"
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  path        = "/"
 }
 # Define the /admin resource
 resource "aws_api_gateway_resource" "admin" {
@@ -40,7 +40,7 @@ resource "aws_api_gateway_resource" "admin_post_id" {
 
 # Define GET,PUT,PATCH,DELETE methods for /admin/posts/{postId}
 locals {
-admin_post_id_methods = ["GET", "PUT", "DELETE"]
+  admin_post_id_methods = ["GET", "PUT", "DELETE"]
 }
 
 resource "aws_api_gateway_method" "admin_post_id_methods" {
@@ -133,3 +133,36 @@ resource "aws_api_gateway_method" "admin_media_upload_post" {
   authorizer_id = aws_api_gateway_authorizer.admin.id
 }
 
+locals {
+  cors_resource_ids = {
+    admin_posts          = aws_api_gateway_resource.admin_posts.id
+    admin_post_id        = aws_api_gateway_resource.admin_post_id.id
+    admin_post_publish   = aws_api_gateway_resource.admin_post_publish.id
+    admin_post_archive   = aws_api_gateway_resource.admin_post_archive.id
+    admin_post_unpublish = aws_api_gateway_resource.admin_post_unpublish.id
+    admin_leads          = aws_api_gateway_resource.admin_leads.id
+    admin_media_upload   = aws_api_gateway_resource.admin_media_upload.id
+  }
+}
+
+resource "aws_api_gateway_method" "admin_options" {
+  for_each      = local.cors_resource_ids
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  resource_id   = each.value
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method_response" "admin_options" {
+  for_each    = local.cors_resource_ids
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = each.value
+  http_method = aws_api_gateway_method.admin_options[each.key].http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = true
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+  }
+}

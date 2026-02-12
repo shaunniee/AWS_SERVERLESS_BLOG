@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+@theme {
+  --font-family: "Manrope", "Segoe UI", sans-serif;
+
+  /* Color palette */
+  --color-background: 42 44% 95%;
+  --color-foreground: 204 36% 14%;
+  --color-card: 0 0% 100%;
+  --color-card-foreground: 204 36% 14%;
+  --color-popover: 0 0% 100%;
+  --color-popover-foreground: 204 36% 14%;
+  --color-primary: 186 65% 32%;
+  --color-primary-foreground: 46 80% 97%;
+  --color-secondary: 37 68% 90%;
+  --color-secondary-foreground: 204 36% 14%;
+  --color-muted: 44 35% 91%;
+  --color-muted-foreground: 204 20% 35%;
+  --color-accent: 181 34% 90%;
+  --color-accent-foreground: 204 36% 14%;
+  --color-destructive: 0 84.2% 60.2%;
+  --color-destructive-foreground: 210 40% 98%;
+  --color-border: 40 30% 82%;
+  --color-input: 40 30% 82%;
+  --color-ring: 186 65% 32%;
+
+  --radius: 0.85rem;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Manrope", "Segoe UI", sans-serif;
+  color: hsl(var(--color-foreground));
+  background:
+    radial-gradient(circle at 0% 0%, rgba(253, 230, 190, 0.55), transparent 35%),
+    radial-gradient(circle at 100% 0%, rgba(148, 214, 221, 0.45), transparent 38%),
+    linear-gradient(180deg, rgba(252, 248, 240, 1) 0%, rgba(245, 239, 228, 1) 100%);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Sora", "Manrope", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.page-enter {
+  animation: page-enter 420ms ease-out;
+}
+
+.glass-panel {
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(255, 255, 255, 0.62) 100%
+  );
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.stat-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -20% -55% auto;
+  width: 180px;
+  height: 180px;
+  border-radius: 999px;
+  opacity: 0.2;
+  background: radial-gradient(circle, rgba(0, 150, 136, 0.45), transparent 70%);
+  pointer-events: none;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

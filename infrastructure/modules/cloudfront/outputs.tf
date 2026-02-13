@@ -1,24 +1,14 @@
-output "distribution_id" {
-    description = "The identifier for the distribution"
-    value       = aws_cloudfront_distribution.this.id
+output "cloudfront_domain_name" {
+  value       = aws_cloudfront_distribution.this.domain_name
+  description = "CloudFront distribution domain name"
 }
 
-output "distribution_arn" {
-    description = "The ARN (Amazon Resource Name) for the distribution"
-    value       = aws_cloudfront_distribution.this.arn
+output "cloudfront_distribution_id" {
+  value       = aws_cloudfront_distribution.this.id
+  description = "CloudFront distribution ID"
 }
 
-output "distribution_domain_name" {
-    description = "The domain name corresponding to the distribution"
-    value       = aws_cloudfront_distribution.this.domain_name
-}
-
-output "distribution_status" {
-    description = "The current status of the distribution"
-    value       = aws_cloudfront_distribution.this.status
-}
-
-output "distribution_hosted_zone_id" {
-    description = "The ID of the hosted zone that CloudFront uses to route traffic to the distribution"
-    value       = aws_cloudfront_distribution.this.hosted_zone_id
+output "cloudfront_key_group_id" {
+  value       = var.kms_key_arn != null ? aws_cloudfront_key_group.signed_urls[0].id : null
+  description = "Key group ID for signed URLs"
 }

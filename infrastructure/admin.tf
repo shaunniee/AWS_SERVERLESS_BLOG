@@ -171,3 +171,40 @@ resource "aws_iam_role_policy_attachment" "notification_lambda_dlq_policy_attach
   role       = module.admin_notifications_lambda.lambda_role_name
   policy_arn = module.notification_lambda_dlq_policy.policy_arn
 }
+
+
+# Create admin cms frontend private bucket
+
+module "admin_frontend_bucket" {
+  source      = "./modules/s3"
+  bucket_name = "${var.name_prefix}-admin-frontend-bucket"
+  tags        = var.tags
+  private_bucket = true
+  force_destroy = false
+}
+
+# Define CloudFront for admin frontend bucket
+
+module "admin_cloudfront" {
+  source            = "./modules/cloudfront"
+  distribution_name = "${var.name_prefix}-admin-cloudfront-distribution"
+  default_root_object = "index.html"
+  price_class       = "PriceClass_100"
+  kms_key_arn = null
+
+  origins = {
+    admin_frontend_bucket = {
+      domain_name       = module.admin_frontend_bucket.bucket_regional_domain_name
+      origin_id         = "admin-frontend-bucket-origin"
+      is_private_origin = true
+    }
+  }
+
+  default_cache_behaviour = {
+    target_origin_id   = "admin-frontend-bucket-origin"
+  }
+  ordered_cache_behaviour = {}
+
+  spa_fallback = true
+  spa_fallback_status_codes = [404]
+}

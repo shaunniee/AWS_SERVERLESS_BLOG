@@ -43,3 +43,60 @@ module "public_lambda_invoke_permission" {
   lambda_function_name = module.public_read_lambda.lambda_function_name
   api_gateway_endpoint = module.public_api_gateway.api_gateway_execution_arn
 }
+
+# Setup frontend public Bucket
+
+module "frontend_bucket" {
+  source      = "./modules/s3"
+  bucket_name = "${var.name_prefix}-frontend-public-bucket"
+  tags        = var.tags
+  private_bucket = true
+  force_destroy = false
+}
+
+# Define CLoudfront for Frontend public and media bucket
+
+module "cloudfront" {
+  source            = "./modules/cloudfront"
+  distribution_name = "${var.name_prefix}-cloudfront-distribution"
+  default_root_object = "index.html"
+  price_class       = "PriceClass_100"
+  kms_key_arn = null
+
+  origins = {
+    frontend_bucket = {
+      domain_name       = module.frontend_bucket.bucket_regional_domain_name
+      origin_id         = "frontend-bucket-origin"
+      is_private_origin = true
+    }
+    
+    media_bucket = {
+      domain_name       = module.media_bucket.bucket_regional_domain_name
+      origin_id         = "media-bucket-origin"
+      is_private_origin = true
+    }
+  }
+
+
+  default_cache_behaviour = {
+    target_origin_id   = "frontend-bucket-origin"
+    
+  }
+
+  ordered_cache_behaviour = {
+    media_files = {
+      path_pattern       = "/media/*"
+      target_origin_id   = "media-bucket-origin"
+      allowed_methods    = ["GET", "HEAD", "OPTIONS"]
+      cached_methods     = ["GET", "HEAD"]
+      cache_disabled     = false
+      requires_signed_url = false
+    }
+  }
+
+  spa_fallback = true
+  spa_fallback_status_codes = [ 404 ]
+
+}
+
+

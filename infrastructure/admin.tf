@@ -115,11 +115,24 @@ module "leads_event" {
               id  = "AdminNotificationsTarget"
             }
           ]
+        },
+        {
+          name ="CleanupRule"
+          description = "Rule to trigger cleanup lambda by admin posts lambda when a post is deleted"
+          event_pattern = jsonencode({
+            source        = ["app.cleanup"],
+            "detail-type" = ["PostDeleted"]
+          })
+          targets = [
+            {
+              arn = module.cleanup_lambda.lambda_arn
+              id  = "CleanupLambdaTarget"
+        }
+          ]
         }
       ]
     }
   ]
-
 }
 
 # permission for eventbridge to invoke admin notifications lambda
@@ -208,3 +221,45 @@ module "admin_cloudfront" {
   spa_fallback = true
   spa_fallback_status_codes = [404]
 }
+
+# Create Cleanup Lambda
+
+module "cleanup_lambda" {
+  source        = "./modules/lambda"
+  function_name = "cleanup-lambda"
+  handler       = "index.handler"
+  runtime       = "nodejs18.x"
+  filename      = "services/cleanup_lambda/cleanup.zip"
+  tags          = var.tags
+  environment_variables = {
+    MEDIA_BUCKET = module.media_bucket.bucket_name
+  }
+}
+
+# Policy for admin lambda to send delete event
+
+module "admin_lambda_event_policy" {
+    source = "./modules/iam/admin-lambda-event-policy"
+    event_bus_arn = module.leads_event.event_bus_arn["${var.name_prefix}-leads-bus"]
+}
+
+# Allow Eventbridge to invoke cleanup lambda
+
+module "eventbridge_invoke_cleanup_lambda" {
+  source               = "./modules/iam/cleanup-lambda-invoke-by-eventbridge"
+  lambda_function_name = module.cleanup_lambda.lambda_function_name
+  source_arn           = module.leads_event.event_arn["${var.name_prefix}-leads-bus:CleanupRule"]
+}
+
+# Policy for cleanup lambda to delete images from s3 bucket
+module "cleanup_lambda_s3_delete_policy" {
+    source = "./modules/iam/clean-up-lambda-s3-delete-permission"
+    bucket_arn = module.media_bucket.bucket_arn
+}
+
+# attach the policy to the cleanup lambda role
+resource "aws_iam_role_policy_attachment" "cleanup_lambda_s3_delete_policy_attachment" {
+  role       = module.cleanup_lambda.lambda_role_name
+  policy_arn = module.cleanup_lambda_s3_delete_policy.policy_arn
+}
+

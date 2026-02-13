@@ -94,6 +94,8 @@ module "admin_notifications_lambda" {
     FROM_EMAIL = module.ses.verified_email
     TO_EMAIL   = module.ses.verified_email
   }
+
+  dead_letter_target_arn = module.notifications_dlq.queue_arn
 }
 
 module "leads_event" {
@@ -233,6 +235,7 @@ module "cleanup_lambda" {
   tags          = var.tags
   environment_variables = {
     MEDIA_BUCKET = module.media_bucket.bucket_name
+    EVENT_BUS_NAME = "${var.name_prefix}-leads-bus"
   }
 }
 
@@ -263,3 +266,23 @@ resource "aws_iam_role_policy_attachment" "cleanup_lambda_s3_delete_policy_attac
   policy_arn = module.cleanup_lambda_s3_delete_policy.policy_arn
 }
 
+# cleanup DLQ
+
+module "cleanup_dlq" {
+  source     = "./modules/sqs"
+  name       = "cleanup-dlq"
+  create_dlq = false
+}
+
+# policy for cleanup lambda to send messages to DLQ
+
+module "cleanup_lambda_dlq_policy" {
+  source                = "./modules/iam/cleanup-lambda-dlq-policy"
+  notifications_dlq_arn = module.cleanup_dlq.queue_arn
+}
+
+# attach the policy to the cleanup lambda role
+resource "aws_iam_role_policy_attachment" "cleanup_lambda_dlq_policy_attachment" {
+  role       = module.cleanup_lambda.lambda_role_name
+  policy_arn = module.cleanup_lambda_dlq_policy.policy_arn
+}

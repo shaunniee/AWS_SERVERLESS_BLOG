@@ -13,6 +13,10 @@ const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
 
 const TABLE = process.env.POSTS_TABLE;
+const { EventBridgeClient, PutEventsCommand } = require("@aws-sdk/client-eventbridge");
+const eventbridge = new EventBridgeClient({});
+
+
 
 const now = () => Date.now();
 
@@ -199,7 +203,33 @@ async function archivePost(postId) {
 }
 
 async function deletePost(postId) {
+  // Fetch the post first to get media keys
+  const { Item: post } = await ddb.send(new GetCommand({ TableName: TABLE, Key: { postID: postId } }));
+
+  if (!post) {
+    return response(404, { message: "Post not found" });
+  }
+
+  // Delete the post from DynamoDB
   await ddb.send(new DeleteCommand({ TableName: TABLE, Key: { postID: postId } }));
+
+  // Emit EventBridge event for cleanup
+  await eventbridge.putEvents({
+    Entries: [
+      {
+        Source: "my.blog.app",
+        DetailType: "PostDeleted",
+        Detail: JSON.stringify({
+          postID: postId,
+          mainImageKey: post.mainImageKey,
+          mediaKeys: post.mediaKeys
+        }),
+        EventBusName: process.env.EVENT_BUS_NAME
+      }
+    ]
+  }).promise();
+
+  // Return 204 No Content
   return response(204);
 }
 

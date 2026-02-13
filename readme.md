@@ -90,8 +90,7 @@ This is how production serverless systems are actually built.
 
 ## 🖼 Architecture Diagram
 
-
-![alt text](infrastructure/architecture_v2.drawio.png)
+![alt text](infrastructure/Architecture_v3.drawio.png)
 ---
 
 ## 🔐 Authentication & Security Decisions

@@ -20,6 +20,12 @@ variable "function_name" {
     type        = string
 }
 
+variable "dead_letter_target_arn" {
+    description = "The ARN of the target to send failed events to"
+    type        = optional(string)
+    default     = null
+}
+
 variable "environment_variables" {
     description = "A map of environment variables to set for the Lambda function"
     type        = map(string)

@@ -40,5 +40,8 @@ resource "aws_lambda_function" "this" {
     tags = merge(var.tags, {
         Name = "${var.function_name}-function"
     })
+    dead_letter_config {
+      target_arn = var.dead_letter_target_arn
+    }
 
 }

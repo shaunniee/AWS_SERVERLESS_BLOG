@@ -27,9 +27,9 @@ export const PublicPostsPage = () => {
     <div className="shell">
       <header className="hero-panel animate-pop">
         <div className="hero">
-          <p className="eyebrow">Serverless Blog</p>
-          <h1>Thoughtful writing on engineering and product.</h1>
-          <p>Freshly published stories from the team.</p>
+          <p className="eyebrow">AWS Projects Blog</p>
+          <h1>Practical stories from real AWS project builds.</h1>
+          <p>Architecture notes, implementation lessons, and production-ready writeups.</p>
         </div>
       </header>
 
@@ -64,28 +64,33 @@ export const PublicPostsPage = () => {
       )}
 
       {secondaryPosts.length > 0 && (
-        <section className="grid">
-          {secondaryPosts.map((post, index) => (
-            <article
-              className="card animate-rise"
-              key={post.postID}
-              style={{ animationDelay: `${Math.min(index * 70, 420)}ms` }}
-            >
-              {post.mainImageKey ? (
-                <img className="card-image" src={resolveMediaSrc(post.mainImageKey)} alt={post.title} loading="lazy" />
-              ) : (
-                <div className="card-image placeholder">No image</div>
-              )}
-              <div className="card-body">
-                <p className="meta">{formatDate(post.publishedAt || post.updatedAt)}</p>
-                <h2>{post.title}</h2>
-                <p className="summary">{getPostSummary(post.content)}</p>
-                <Link className="read-link" to={`/posts/${post.postID}`}>
-                  Read article
-                </Link>
-              </div>
-            </article>
-          ))}
+        <section>
+          <div className="section-head">
+            <h3>Latest Articles</h3>
+          </div>
+          <div className="grid">
+            {secondaryPosts.map((post, index) => (
+              <article
+                className="card animate-rise"
+                key={post.postID}
+                style={{ animationDelay: `${Math.min(index * 70, 420)}ms` }}
+              >
+                {post.mainImageKey ? (
+                  <img className="card-image" src={resolveMediaSrc(post.mainImageKey)} alt={post.title} loading="lazy" />
+                ) : (
+                  <div className="card-image placeholder">No image</div>
+                )}
+                <div className="card-body">
+                  <p className="meta">{formatDate(post.publishedAt || post.updatedAt)}</p>
+                  <h2>{post.title}</h2>
+                  <p className="summary">{getPostSummary(post.content)}</p>
+                  <Link className="read-link" to={`/posts/${post.postID}`}>
+                    Read article
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
       )}
 

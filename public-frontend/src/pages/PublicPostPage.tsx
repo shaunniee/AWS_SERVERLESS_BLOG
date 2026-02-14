@@ -38,7 +38,7 @@ export const PublicPostPage = () => {
 
       <article className="article animate-rise">
         <header>
-          <p className="eyebrow">Article</p>
+          <p className="eyebrow">AWS Projects Blog</p>
           <h1>{post.title}</h1>
           <p className="meta">{new Date(post.publishedAt || post.updatedAt).toLocaleString()}</p>
         </header>

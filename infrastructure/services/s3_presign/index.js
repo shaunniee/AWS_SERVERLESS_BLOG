@@ -2,7 +2,9 @@ const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { randomUUID } = require("crypto");
 
-const s3 = new S3Client({});
+const s3 = new S3Client({
+  region: process.env.MEDIA_BUCKET_REGION || process.env.AWS_REGION || "us-east-1"
+});
 
 const BUCKET = process.env.MEDIA_BUCKET;
 const EXPIRY = Number(process.env.UPLOAD_EXPIRY_SECONDS || 300);

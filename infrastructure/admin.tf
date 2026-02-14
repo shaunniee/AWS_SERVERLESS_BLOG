@@ -9,6 +9,7 @@ module "admin_posts_lambda" {
   tags          = var.tags
   environment_variables = {
     POSTS_TABLE = module.posts_table_v2.table_name
+    EVENT_BUS_NAME = "${var.name_prefix}-leads-bus"
   }
 }
 
@@ -21,6 +22,7 @@ module "admin_media_presign_lambda" {
   tags          = var.tags
   environment_variables = {
     MEDIA_BUCKET = module.media_bucket.bucket_name
+    MEDIA_BUCKET_REGION = var.aws_region
   }
 }
 
@@ -202,7 +204,7 @@ module "admin_frontend_bucket" {
 
 module "admin_cloudfront" {
   source            = "./modules/cloudfront"
-  distribution_name = "${var.name_prefix}-admin-cloudfront-distribution"
+  distribution_name = "${var.name_prefix}-admin-cf"
   default_root_object = "index.html"
   price_class       = "PriceClass_100"
   kms_key_arn = null
@@ -235,6 +237,7 @@ module "cleanup_lambda" {
   tags          = var.tags
   environment_variables = {
     MEDIA_BUCKET = module.media_bucket.bucket_name
+    MEDIA_BUCKET_REGION = var.aws_region
     EVENT_BUS_NAME = "${var.name_prefix}-leads-bus"
   }
 }
@@ -244,6 +247,12 @@ module "cleanup_lambda" {
 module "admin_lambda_event_policy" {
     source = "./modules/iam/admin-lambda-event-policy"
     event_bus_arn = module.leads_event.event_bus_arn["${var.name_prefix}-leads-bus"]
+}
+
+# attach the policy to the admin posts lambda role
+resource "aws_iam_role_policy_attachment" "admin_lambda_event_policy_attachment" {
+  role       = module.admin_posts_lambda.lambda_role_name
+  policy_arn = module.admin_lambda_event_policy.policy_arn
 }
 
 # Allow Eventbridge to invoke cleanup lambda

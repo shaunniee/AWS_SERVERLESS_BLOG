@@ -1,6 +1,6 @@
 resource "aws_iam_policy" "notifications_dlq" {
-    name = "NotificationsLambdaDLQPolicy"
-    description = "Policy to allow notifications lambda to send messages to DLQ"
+    name = "CleanupLambdaDLQPolicy"
+    description = "Policy to allow cleanup lambda to send messages to DLQ"
     policy = jsonencode({
         Version = "2012-10-17",
         Statement = [

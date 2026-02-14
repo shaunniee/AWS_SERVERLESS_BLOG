@@ -22,7 +22,7 @@ variable "function_name" {
 
 variable "dead_letter_target_arn" {
     description = "The ARN of the target to send failed events to"
-    type        = optional(string)
+    type        = string
     default     = null
 }
 

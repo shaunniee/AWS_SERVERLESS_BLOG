@@ -1,6 +1,8 @@
 const { S3Client, DeleteObjectsCommand } = require("@aws-sdk/client-s3");
 
-const s3 = new S3Client({ region: process.env.AWS_REGION });
+const s3 = new S3Client({
+  region: process.env.MEDIA_BUCKET_REGION || process.env.AWS_REGION || "us-east-1"
+});
 const BUCKET = process.env.MEDIA_BUCKET;
 
 async function handler(event) {

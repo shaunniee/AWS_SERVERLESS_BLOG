@@ -214,10 +214,10 @@ async function deletePost(postId) {
   await ddb.send(new DeleteCommand({ TableName: TABLE, Key: { postID: postId } }));
 
   // Emit EventBridge event for cleanup
-  await eventbridge.putEvents({
+  await eventbridge.send(new PutEventsCommand({
     Entries: [
       {
-        Source: "my.blog.app",
+        Source: "app.cleanup",
         DetailType: "PostDeleted",
         Detail: JSON.stringify({
           postID: postId,
@@ -227,7 +227,7 @@ async function deletePost(postId) {
         EventBusName: process.env.EVENT_BUS_NAME
       }
     ]
-  }).promise();
+  }));
 
   // Return 204 No Content
   return response(204);

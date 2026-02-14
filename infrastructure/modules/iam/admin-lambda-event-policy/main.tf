@@ -5,7 +5,7 @@ variable "event_bus_arn" {
 
 
 resource "aws_iam_policy" "leads_lambda_event_policy" {
-    name        = "leads-lambda-event-policy"
+    name        = "admin-lambda-event-policy"
     description = "IAM policy for leads lambda to send events to EventBridge"
     policy = jsonencode({
         Version = "2012-10-17"

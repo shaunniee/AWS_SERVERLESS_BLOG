@@ -226,6 +226,33 @@ module "admin_cloudfront" {
   spa_fallback_status_codes = [404]
 }
 
+data "aws_iam_policy_document" "admin_frontend_bucket_cloudfront_read" {
+  statement {
+    sid     = "AllowCloudFrontReadAdminFrontendBucket"
+    effect  = "Allow"
+    actions = ["s3:GetObject"]
+    resources = [
+      "${module.admin_frontend_bucket.bucket_arn}/*"
+    ]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [module.admin_cloudfront.cloudfront_distribution_arn]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "admin_frontend_bucket_cloudfront_read" {
+  bucket = module.admin_frontend_bucket.bucket_name
+  policy = data.aws_iam_policy_document.admin_frontend_bucket_cloudfront_read.json
+}
+
 # Create Cleanup Lambda
 
 module "cleanup_lambda" {

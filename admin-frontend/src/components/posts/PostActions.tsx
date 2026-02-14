@@ -131,7 +131,7 @@ export const PostActions = ({ post }: PostActionsProps) => {
       </DropdownMenu>
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
+        <DialogContent className="border-white/80 bg-white/95 shadow-[0_24px_60px_-35px_rgba(15,23,42,0.85)] backdrop-blur-md">
           <DialogHeader>
             <DialogTitle>Delete Post</DialogTitle>
             <DialogDescription>

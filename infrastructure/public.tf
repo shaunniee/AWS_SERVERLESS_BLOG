@@ -99,3 +99,56 @@ module "cloudfront" {
 
 }
 
+data "aws_iam_policy_document" "frontend_bucket_cloudfront_read" {
+  statement {
+    sid     = "AllowCloudFrontReadFrontendBucket"
+    effect  = "Allow"
+    actions = ["s3:GetObject"]
+    resources = [
+      "${module.frontend_bucket.bucket_arn}/*"
+    ]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [module.cloudfront.cloudfront_distribution_arn]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "frontend_bucket_cloudfront_read" {
+  bucket = module.frontend_bucket.bucket_name
+  policy = data.aws_iam_policy_document.frontend_bucket_cloudfront_read.json
+}
+
+data "aws_iam_policy_document" "media_bucket_cloudfront_read" {
+  statement {
+    sid     = "AllowCloudFrontReadMediaBucket"
+    effect  = "Allow"
+    actions = ["s3:GetObject"]
+    resources = [
+      "${module.media_bucket.bucket_arn}/*"
+    ]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [module.cloudfront.cloudfront_distribution_arn]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "media_bucket_cloudfront_read" {
+  bucket = module.media_bucket.bucket_name
+  policy = data.aws_iam_policy_document.media_bucket_cloudfront_read.json
+}

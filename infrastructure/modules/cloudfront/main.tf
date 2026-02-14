@@ -7,8 +7,8 @@ data "aws_cloudfront_cache_policy" "caching_disabled" {
   name = "Managed-CachingDisabled"
 }
 
-data "aws_cloudfront_origin_request_policy" "all_viewer" {
-  name = "Managed-AllViewer"
+data "aws_cloudfront_origin_request_policy" "s3_origin" {
+  name = "Managed-CORS-S3Origin"
 }
 
 # Origin Access Control for private buckets
@@ -68,7 +68,7 @@ resource "aws_cloudfront_distribution" "this" {
     allowed_methods          = ["GET", "HEAD", "OPTIONS"]
     cached_methods           = ["GET", "HEAD"]
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_optimized.id
-    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer.id
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.s3_origin.id
   }
 
   # Ordered cache behaviors
@@ -88,7 +88,7 @@ resource "aws_cloudfront_distribution" "this" {
         : data.aws_cloudfront_cache_policy.caching_optimized.id
       )
 
-      origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer.id
+      origin_request_policy_id = data.aws_cloudfront_origin_request_policy.s3_origin.id
 
       trusted_key_groups = (
         lookup(ordered_cache_behavior.value, "requires_signed_url", false) && var.kms_key_arn != null

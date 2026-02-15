@@ -27,3 +27,13 @@ output "frontend_aws_region" {
   description = "AWS region for VITE_AWS_REGION"
   value       = var.aws_region
 }
+
+output "public_frontend_pipeline_name" {
+  description = "Name of the public frontend CodePipeline"
+  value       = module.public_frontend_pipeline.pipeline_name
+}
+
+output "public_frontend_codebuild_project_name" {
+  description = "Name of the public frontend CodeBuild project"
+  value       = module.public_frontend_codebuild.project_name
+}

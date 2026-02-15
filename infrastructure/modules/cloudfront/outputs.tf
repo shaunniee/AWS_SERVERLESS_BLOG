@@ -17,3 +17,8 @@ output "cloudfront_key_group_id" {
   value       = var.kms_key_arn != null ? aws_cloudfront_key_group.signed_urls[0].id : null
   description = "Key group ID for signed URLs"
 }
+
+output "cdn_url" {
+  value       = "https://${aws_cloudfront_distribution.this.domain_name}"
+  description = "CDN URL for media assets"
+}

@@ -3,8 +3,9 @@ variable "parameters" {
   type = list(object({
     name        = string
     value       = string
-    type        = optional(string, "String")   # String | StringList | SecureString
-    key_id      = optional(string, null)       # KMS key for SecureString
+    description = optional(string, null)
+    type        = optional(string, "String") # String | StringList | SecureString
+    key_id      = optional(string, null)     # KMS key for SecureString
     tags        = optional(map(string), {})
   }))
   default = []

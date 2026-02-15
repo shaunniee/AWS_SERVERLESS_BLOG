@@ -34,3 +34,9 @@ variable "public_frontend_branch" {
   type        = string
   default     = "main"
 }
+
+variable "admin_frontend_branch" {
+  description = "Git branch for the admin frontend deployment pipeline"
+  type        = string
+  default     = "main"
+}

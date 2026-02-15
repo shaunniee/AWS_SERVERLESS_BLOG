@@ -37,3 +37,13 @@ output "public_frontend_codebuild_project_name" {
   description = "Name of the public frontend CodeBuild project"
   value       = module.public_frontend_codebuild.project_name
 }
+
+output "admin_frontend_pipeline_name" {
+  description = "Name of the admin frontend CodePipeline"
+  value       = module.admin_frontend_pipeline.pipeline_name
+}
+
+output "admin_frontend_codebuild_project_name" {
+  description = "Name of the admin frontend CodeBuild project"
+  value       = module.admin_frontend_codebuild.project_name
+}

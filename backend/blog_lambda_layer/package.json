@@ -1,0 +1,14 @@
+{
+  "name": "serverless-blog-nodejs-layer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Common dependencies for serverless-blog Lambda functions",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "3.888.0",
+    "@aws-sdk/client-eventbridge": "3.888.0",
+    "@aws-sdk/client-s3": "3.888.0",
+    "@aws-sdk/client-ses": "3.888.0",
+    "@aws-sdk/lib-dynamodb": "3.888.0",
+    "@aws-sdk/s3-request-presigner": "3.888.0"
+  }
+}

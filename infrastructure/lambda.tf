@@ -344,4 +344,3 @@ module "cleanup_lambda_invoke_permission" {
     source_arn = module.event.event_bus_arn["blog-events-bus"]
     statementId = "AllowExecutionFromEventBridgeForCleanupLambda"
 }
-

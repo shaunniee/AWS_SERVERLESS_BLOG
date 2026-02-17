@@ -466,8 +466,195 @@ module "admin_api" {
       }
     }
   }
+}
 
 
 
+# Define public api gateway
+
+module "public_api" {
+  source = "${var.module_link}//aws_api_gateway_rest_api?ref=main"
+  name   = "public-api"
+  resources = {
+    # /posts
+    posts = {
+      path_part = "posts"
+    }
+    # /posts/{postId}
+    postId = {
+      path_part  = "{postId}"
+      parent_key = "posts"
+    }
+    # /leads
+    leads = {
+      path_part = "leads"
+    }
+  }
+
+  methods = {
+    # GET /posts
+    get_posts = {
+      http_method   = "GET"
+      resource_key  = "posts"
+      authorization = "NONE"
+    }
+    # GET /posts/{postId}
+    get_post = {
+      http_method   = "GET"
+      resource_key  = "postId"
+      authorization = "NONE"
+    }
+    # POST /leads
+    create_lead = {
+      http_method   = "POST"
+      resource_key  = "leads"
+      authorization = "NONE"
+    }
+    # CORS Preflight options for /posts
+    posts_options = {
+      http_method   = "OPTIONS"
+      resource_key  = "posts"
+      authorization = "NONE"
+    }
+    # CORS Preflight options for /posts/{postId}
+    postId_options = {
+      http_method   = "OPTIONS"
+      resource_key  = "postId"
+      authorization = "NONE"
+    }
+    # CORS Preflight options for /leads
+    leads_options = {
+      http_method   = "OPTIONS"
+      resource_key  = "leads"
+      authorization = "NONE"
+    }
+}
+integrations={
+    # Integration for GET /posts
+    get_posts = {
+      method_key              = "get_posts"
+      integration_http_method = "POST"
+      type                    = "AWS_PROXY"
+      uri                     = "${module.public_blog_posts_lambda.lambda_function_invoke_arn}/live"
+    }
+    # Integration for GET /posts/{postId}
+    get_post = {
+      method_key              = "get_post"
+      integration_http_method = "POST"
+      type                    = "AWS_PROXY"
+      uri                     = "${module.public_blog_posts_lambda.lambda_function_invoke_arn}/live"
+    }
+    # Integration for POST /leads
+    create_lead = {
+      method_key              = "create_lead"
+      integration_http_method = "POST"
+      type                    = "AWS_PROXY"
+      uri                     = "${module.leads_lambda.lambda_function_invoke_arn}/live"
+    }
+    # CORS Preflight options for /posts
+    posts_options = {
+      method_key              = "posts_options"
+      integration_http_method = "OPTIONS"
+      type                    = "MOCK"
+      uri                     = null
+      request_templates = {
+        "application/json" = <<EOF
+            {
+                "statusCode": 200
+                }
+            EOF
+      }
+    }
+    # CORS Preflight options for /posts/{postId}
+    postId_options = {
+      method_key              = "postId_options"
+      integration_http_method = "OPTIONS"
+      type                    = "MOCK"
+      uri                     = null
+      request_templates = {
+        "application/json" = <<EOF
+            {
+                "statusCode": 200
+                }
+            EOF
+      }
+    }
+    # CORS Preflight options for /leads
+    leads_options = {
+      method_key              = "leads_options"
+      integration_http_method = "OPTIONS"
+      type                    = "MOCK"
+      uri                     = null
+      request_templates = {
+        "application/json" = <<EOF
+            {
+                "statusCode": 200 
+                }
+            EOF
+      }
+    }
+}
+method_responses = {
+    posts_options_200 = {
+      method_key  = "posts_options"
+      status_code = "200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = true
+        "method.response.header.Access-Control-Allow-Methods" = true
+        "method.response.header.Access-Control-Allow-Headers" = true
+      }
+    }
+
+    postId_options_200 = {
+      method_key  = "postId_options"
+      status_code = "200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = true
+        "method.response.header.Access-Control-Allow-Methods" = true
+        "method.response.header.Access-Control-Allow-Headers" = true
+      }
+    }
+
+    leads_options_200 = {
+      method_key  = "leads_options"
+      status_code = "200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = true
+        "method.response.header.Access-Control-Allow-Methods" = true
+        "method.response.header.Access-Control-Allow-Headers" = true
+      }
+    }
+  }
+
+  integration_responses = {
+    posts_options_200 = {
+      method_response_key = "posts_options_200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+        "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+      }
+    }
+
+    postId_options_200 = {
+      method_response_key = "postId_options_200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+        "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+      }
+    }
+
+    leads_options_200 = {
+      method_response_key = "leads_options_200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+        "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+      }
+    }
+  }
 
 }
+
+

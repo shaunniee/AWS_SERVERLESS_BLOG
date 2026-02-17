@@ -63,6 +63,14 @@ resource "aws_iam_role_policy_attachment" "admin_blog_posts_lambda_event_policy_
     role       = module.admin_blog_posts_lambda.lambda_role_arn
     policy_arn = module.admin_blog_posts_lambda_event_permission.policy_arn
 }
+# Admin lambda invoke my admin api
+
+module "admin_blog_posts_lambda_invoke_permission" {
+    source = "./iam/policies/lambda-invoke"
+    lambda_arn = module.admin_blog_posts_lambda.lambda_arn
+    source_arn = module.admin_api.rest_api_execution_arn
+    statementId = "AllowExecutionFromAPIGatewayForAdminBlogPostsLambda"
+}
 
 # Define S3 presigned URL lambda function
 # Routes: POST /media/upload_url
@@ -107,6 +115,15 @@ resource "aws_iam_role_policy_attachment" "presign_lambda_policy_attachment" {
     policy_arn = module.presign_lambda_permissions.policy_arn
 }
 
+# Presign lambda invoke by api gateway permission
+
+module "presign_lambda_invoke_permission" {
+    source = "./iam/policies/lambda-invoke"
+    lambda_arn = module.presign_lambda.lambda_arn
+    source_arn = module.admin_api.rest_api_execution_arn
+    statementId = "AllowExecutionFromAPIGatewayForPresignLambda"
+}
+
 # Define Public read lambda function
 # Routes: GET /posts, GET /posts/{id}
 
@@ -146,6 +163,15 @@ module "public_posts_lambda_permissions" {
 resource "aws_iam_role_policy_attachment" "public_posts_lambda_policy_attachment" {
     role       = module.public_posts_lambda.lambda_role_arn
     policy_arn = module.public_posts_lambda_permissions.policy_arn
+}
+
+# Public posts lambda invoke by api gateway permission
+
+module "public_posts_lambda_invoke_permission" {
+    source = "./iam/policies/lambda-invoke"
+    lambda_arn = module.public_posts_lambda.lambda_arn
+    source_arn = module.public_api.rest_api_execution_arn
+    statementId = "AllowExecutionFromAPIGatewayForPublicPostsLambda"
 }
 
 
@@ -199,6 +225,24 @@ module "leads_lambda_event_permission" {
 resource "aws_iam_role_policy_attachment" "leads_lambda_event_policy_attachment" {
     role       = module.leads_lambda.lambda_role_arn
     policy_arn = module.leads_lambda_event_permission.policy_arn
+}
+
+# leads lambda to be invoked by both admin and public api
+
+module "leads_lambda_admin_invoke_permission" {
+
+    source = "./iam/policies/lambda-invoke"
+    lambda_arn = module.leads_lambda.lambda_arn
+    source_arn = module.admin_api.rest_api_execution_arn
+    statementId = "AllowExecutionFromAPIGatewayForLeadsLambdaAdmin"
+}
+
+module "leads_lambda_public_invoke_permission" {
+
+    source = "./iam/policies/lambda-invoke"
+    lambda_arn = module.leads_lambda.lambda_arn
+    source_arn = module.public_api.rest_api_execution_arn
+    statementId = "AllowExecutionFromAPIGatewayForLeadsLambdaPublic"
 }
 
 # Define Notifications lambda function

@@ -9,3 +9,9 @@ variable "aws_region" {
     type        = string
     default     = "eu-west-1"
 }
+
+variable "module_link" {
+    description = "The source link for the module to use."
+    type        = string
+    default     = "git::https://github.com/shaunniee/terraform_modules.git"
+    }

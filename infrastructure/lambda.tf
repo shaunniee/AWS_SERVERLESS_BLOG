@@ -42,14 +42,14 @@ module "admin_blog_posts_lambda" {
 # Admin blog lambda permission and permission boundry
 
 module "admin_blog_posts_lambda_permission" {
-    source = "./iam/policies/admin-lambda-dynamodb-policy"
+    source = "./iam/policies/admin-lambda-dynamodb-posts-policy"
     dynamodb_table_arn = module.posts_table.table_arn
 }
 
 # Attach the policy to the lambda execution role
 
 resource "aws_iam_role_policy_attachment" "admin_blog_posts_lambda_policy_attachment" {
-    role       = module.admin_blog_posts_lambda.lambda_role_arn
+    role       = module.admin_blog_posts_lambda.lambda_role_name
     policy_arn = module.admin_blog_posts_lambda_permission.policy_arn
 }
 # Admin blog lambda permission to send event to EventBridge
@@ -60,7 +60,7 @@ module "admin_blog_posts_lambda_event_permission" {
 
 # Attach the policy to the lambda execution role
 resource "aws_iam_role_policy_attachment" "admin_blog_posts_lambda_event_policy_attachment" {
-    role       = module.admin_blog_posts_lambda.lambda_role_arn
+    role       = module.admin_blog_posts_lambda.lambda_role_name
     policy_arn = module.admin_blog_posts_lambda_event_permission.policy_arn
 }
 # Admin lambda invoke my admin api
@@ -111,7 +111,7 @@ module "presign_lambda_permissions" {
 
 # Attach the policy to the lambda execution role
 resource "aws_iam_role_policy_attachment" "presign_lambda_policy_attachment" {
-    role       = module.presign_lambda.lambda_role_arn
+    role       = module.presign_lambda.lambda_role_name
     policy_arn = module.presign_lambda_permissions.policy_arn
 }
 
@@ -161,7 +161,7 @@ module "public_posts_lambda_permissions" {
 
 # Attach the policy to the lambda execution role
 resource "aws_iam_role_policy_attachment" "public_posts_lambda_policy_attachment" {
-    role       = module.public_posts_lambda.lambda_role_arn
+    role       = module.public_posts_lambda.lambda_role_name
     policy_arn = module.public_posts_lambda_permissions.policy_arn
 }
 
@@ -211,7 +211,7 @@ module "leads_lambda_permissions" {
 
 # Attach the policy to the lambda execution role
 resource "aws_iam_role_policy_attachment" "leads_lambda_policy_attachment" {
-    role       = module.leads_lambda.lambda_role_arn
+    role       = module.leads_lambda.lambda_role_name
     policy_arn = module.leads_lambda_permissions.policy_arn
 }
 
@@ -223,7 +223,7 @@ module "leads_lambda_event_permission" {
 
 # Attach the policy to the lambda execution role
 resource "aws_iam_role_policy_attachment" "leads_lambda_event_policy_attachment" {
-    role       = module.leads_lambda.lambda_role_arn
+    role       = module.leads_lambda.lambda_role_name
     policy_arn = module.leads_lambda_event_permission.policy_arn
 }
 
@@ -277,12 +277,12 @@ module "notifications_lambda" {
 # Notifications lambda permission to send email via SES
 module "notifications_lambda_ses_permission" {
     source = "./iam/policies/notifications-lambda-ses-policy"
-    ses_arn = module.notifications_ses.email_identity_arns[0]
+    ses_arn = module.notifications_ses.email_identity_arns["devsts14@gmail.com"]
 }
 
 # Attach the policy to the lambda execution role
 resource "aws_iam_role_policy_attachment" "notifications_lambda_ses_policy_attachment" {
-    role       = module.notifications_lambda.lambda_role_arn
+    role       = module.notifications_lambda.lambda_role_name
     policy_arn = module.notifications_lambda_ses_permission.policy_arn
 }
 
@@ -332,7 +332,7 @@ module "cleanup_lambda_s3_permission" {
 
 # Attach the policy to the lambda execution role
 resource "aws_iam_role_policy_attachment" "cleanup_lambda_s3_policy_attachment" {
-    role       = module.cleanup_lambda.lambda_role_arn
+    role       = module.cleanup_lambda.lambda_role_name
     policy_arn = module.cleanup_lambda_s3_permission.policy_arn
 }
 

@@ -10,8 +10,8 @@ variable "aws_region" {
     default     = "eu-west-1"
 }
 
-variable "module_link" {
-    description = "The source link for the module to use."
+variable "name_prefix" {
+    description = "A prefix to add to all resource names."
     type        = string
-    default     = "git::https://github.com/shaunniee/terraform_modules.git"
-    }
+    default     = "sblg-"
+}

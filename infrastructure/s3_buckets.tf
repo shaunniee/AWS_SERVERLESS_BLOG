@@ -2,7 +2,7 @@
 
 module "media_bucket" {
     source = "git::https://github.com/shaunniee/terraform_modules.git//aws_s3?ref=main"
-    bucket_name = "serverless-media-bucket"
+    bucket_name = "${var.name_prefix}media-bucket"
     private_bucket = true
     force_destroy = false
     prevent_destroy = true
@@ -17,8 +17,10 @@ module "media_bucket" {
         {
             id = "media-lifecycle-rule"
             enabled = true
-            prefix = "media/"
-            transitions = [
+            filter = {
+                prefix = "media/"
+            }
+            transition = [
                 {
                     days = 30
                     storage_class = "STANDARD_IA"
@@ -31,7 +33,7 @@ module "media_bucket" {
             noncurrent_version_expiration = [{
                 noncurrent_days = 365
             }]
-            noncurrent_version_transitions = [
+            noncurrent_version_transition = [
                 {
                     noncurrent_days = 30
                     storage_class = "STANDARD_IA"
@@ -56,7 +58,7 @@ module "media_bucket" {
 
 module "public_frontend_bucket" {
     source = "git::https://github.com/shaunniee/terraform_modules.git//aws_s3?ref=main"
-    bucket_name = "serverless-public-frontend-bucket"
+    bucket_name = "${var.name_prefix}public-frontend-bucket"
     private_bucket = true
     force_destroy = false
     prevent_destroy = true
@@ -71,8 +73,10 @@ module "public_frontend_bucket" {
         {
             id = "frontend-lifecycle-rule"
             enabled = true
-            prefix = "frontend/"
-            transitions = [
+            filter = {
+                prefix = "frontend/"
+            }
+            transition = [
                 {
                     days = 30
                     storage_class = "STANDARD_IA"
@@ -97,7 +101,7 @@ module "public_frontend_bucket" {
 
 module "admin_frontend_bucket" {
     source = "git::https://github.com/shaunniee/terraform_modules.git//aws_s3?ref=main"
-    bucket_name = "serverless-admin-frontend-bucket"
+    bucket_name = "${var.name_prefix}admin-frontend-bucket"
     private_bucket = true
     force_destroy = false
     prevent_destroy = true
@@ -112,8 +116,10 @@ module "admin_frontend_bucket" {
         {
             id = "admin-frontend-lifecycle-rule"
             enabled = true
-            prefix = "frontend/"
-            transitions = [
+            filter = {
+                prefix = "frontend/"
+            }
+            transition = [
                 {
                     days = 30
                     storage_class = "STANDARD_IA"

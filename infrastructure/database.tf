@@ -2,7 +2,7 @@
 
 module "posts_table" {
     source = "git::https://github.com/shaunniee/terraform_modules.git//aws_dynamodb?ref=main"
-    table_name = "posts"
+    table_name = "${var.name_prefix}posts"
     hash_key = "postID"
     billing_mode = "PAY_PER_REQUEST"
 
@@ -57,7 +57,7 @@ module "posts_table" {
 
 module "leads_table" {
     source = "git::https://github.com/shaunniee/terraform_modules.git//aws_dynamodb?ref=main"
-    table_name = "leads"
+    table_name = "${var.name_prefix}leads"
     hash_key = "leadID"
     billing_mode = "PAY_PER_REQUEST"
     attributes = [

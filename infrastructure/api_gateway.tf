@@ -189,98 +189,98 @@ module "admin_api" {
       method_key              = "get_posts"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}"
     }
     # Integration for POST /admin/posts
     create_post = {
       method_key              = "create_post"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}"
     }
     # Integration for GET /admin/posts/{postId}
     get_post = {
       method_key              = "get_post"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}"
     }
     # Integration for PUT /admin/posts/{postId}
     update_post = {
       method_key              = "update_post"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}"
     }
     # Integration for DELETE /admin/posts/{postId}
     delete_post = {
       method_key              = "delete_post"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}"
     }
     # Integration for POST /admin/posts/{postId}/publish
     publish_post = {
       method_key              = "publish_post"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}"
     }
     # Integration for POST /admin/posts/{postId}/unpublish
     unpublish_post = {
       method_key              = "unpublish_post"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}"
     }
     # Integration for POST /admin/posts/{postId}/archive
     archive_post = {
       method_key              = "archive_post"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}"
     }
     # Integration for POST /admin/posts/{postId}/unarchive
     unarchive_post = {
       method_key              = "unarchive_post"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.admin_blog_posts_lambda.lambda_function_invoke_arn}"
     }
     # Integration for GET /admin/media/upload_url
     get_upload_url = {
       method_key              = "get_upload_url"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.presign_lambda.lambda_function_invoke_arn}/live"
+      uri                     = module.presign_lambda.lambda_function_invoke_arn
     }
     # Integration for GET /admin/leads
     get_leads = {
       method_key              = "get_leads"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.leads_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.leads_lambda.lambda_function_invoke_arn}"
     }
     # Integration for GET /admin/leads/{leadId}
     get_lead = {
       method_key              = "get_lead"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.leads_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.leads_lambda.lambda_function_invoke_arn}"
     }
     # Integration for PUT /admin/leads/{leadId}
     update_lead = {
       method_key              = "update_lead"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.leads_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.leads_lambda.lambda_function_invoke_arn}"
     }
     # Integration for DELETE /admin/leads/{leadId}
     delete_lead = {
       method_key              = "delete_lead"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.leads_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.leads_lambda.lambda_function_invoke_arn}"
     }
     # CORS Preflight options for /admin/posts
     posts_options = {
@@ -459,7 +459,7 @@ module "admin_api" {
 # Define public api gateway
 
 module "public_api" {
-  source = "${var.module_link}//aws_api_gateway_rest_api?ref=main"
+  source = "git::https://github.com/shaunniee/terraform_modules.git//aws_api_gateway_rest_api?ref=main"
   name   = "public-api"
   resources = {
     # /posts
@@ -521,21 +521,21 @@ integrations={
       method_key              = "get_posts"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.public_blog_posts_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.public_posts_lambda.lambda_function_invoke_arn}"
     }
     # Integration for GET /posts/{postId}
     get_post = {
       method_key              = "get_post"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.public_blog_posts_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.public_posts_lambda.lambda_function_invoke_arn}"
     }
     # Integration for POST /leads
     create_lead = {
       method_key              = "create_lead"
       integration_http_method = "POST"
       type                    = "AWS_PROXY"
-      uri                     = "${module.leads_lambda.lambda_function_invoke_arn}/live"
+      uri                     = "${module.leads_lambda.lambda_function_invoke_arn}"
     }
     # CORS Preflight options for /posts
     posts_options = {

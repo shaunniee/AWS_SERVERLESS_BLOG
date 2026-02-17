@@ -39,6 +39,31 @@ module "admin_blog_posts_lambda" {
     }
 }
 
+# Admin blog lambda permission and permission boundry
+
+module "admin_blog_posts_lambda_permission" {
+    source = "./iam/policies/admin-lambda-dynamodb-policy"
+    dynamodb_table_arn = module.posts_table.table_arn
+}
+
+# Attach the policy to the lambda execution role
+
+resource "aws_iam_role_policy_attachment" "admin_blog_posts_lambda_policy_attachment" {
+    role       = module.admin_blog_posts_lambda.lambda_role_arn
+    policy_arn = module.admin_blog_posts_lambda_permission.policy_arn
+}
+# Admin blog lambda permission to send event to EventBridge
+module "admin_blog_posts_lambda_event_permission" {
+    source = "./iam/policies/admin-lambda-event-policy"
+    eventbridge_bus_arn = module.event.event_bus_arn["blog-events-bus"]
+}
+
+# Attach the policy to the lambda execution role
+resource "aws_iam_role_policy_attachment" "admin_blog_posts_lambda_event_policy_attachment" {
+    role       = module.admin_blog_posts_lambda.lambda_role_arn
+    policy_arn = module.admin_blog_posts_lambda_event_permission.policy_arn
+}
+
 # Define S3 presigned URL lambda function
 # Routes: POST /media/upload_url
 
@@ -69,6 +94,18 @@ module "presign_lambda" {
     }
 }
 
+# Presign lambda permission for presigned url PUT
+
+module "presign_lambda_permissions" {
+    source = "./iam/policies/presign-lambda-policy"
+    s3_bucket_arn = module.media_bucket.bucket_arn
+}
+
+# Attach the policy to the lambda execution role
+resource "aws_iam_role_policy_attachment" "presign_lambda_policy_attachment" {
+    role       = module.presign_lambda.lambda_role_arn
+    policy_arn = module.presign_lambda_permissions.policy_arn
+}
 
 # Define Public read lambda function
 # Routes: GET /posts, GET /posts/{id}
@@ -98,6 +135,20 @@ module "public_posts_lambda" {
     }
 }
 
+# Public posts lambda permission for read only access to DynamoDB
+
+module "public_posts_lambda_permissions" {
+    source = "./iam/policies/public-lambda-dynamodb-posts-policy"
+    dynamodb_table_arn = module.posts_table.table_arn
+}
+
+# Attach the policy to the lambda execution role
+resource "aws_iam_role_policy_attachment" "public_posts_lambda_policy_attachment" {
+    role       = module.public_posts_lambda.lambda_role_arn
+    policy_arn = module.public_posts_lambda_permissions.policy_arn
+}
+
+
 # Define Leads lambda function
 # Routes: POST /leads, GET /admin/leads, GET /admin/leads/{id}, DELETE /admin/leads/{id} ,PUT /admin/leads/{id}
 
@@ -124,6 +175,30 @@ module "leads_lambda" {
     environment_variables = {
         LEADS_TABLE = module.leads_table.table_name
     }
+}
+
+# Leads lambda permission for access to DynamoDB
+module "leads_lambda_permissions" {
+    source = "./iam/policies/leads-lambda-dynamodb-leads-policy"
+    dynamodb_table_arn = module.leads_table.table_arn
+}
+
+# Attach the policy to the lambda execution role
+resource "aws_iam_role_policy_attachment" "leads_lambda_policy_attachment" {
+    role       = module.leads_lambda.lambda_role_arn
+    policy_arn = module.leads_lambda_permissions.policy_arn
+}
+
+# Leads lambda permission to send event to EventBridge
+module "leads_lambda_event_permission" {
+    source = "./iam/policies/leads-lambda-event-policy"
+    eventbridge_bus_arn = module.event.event_bus_arn["blog-events-bus"]
+}
+
+# Attach the policy to the lambda execution role
+resource "aws_iam_role_policy_attachment" "leads_lambda_event_policy_attachment" {
+    role       = module.leads_lambda.lambda_role_arn
+    policy_arn = module.leads_lambda_event_permission.policy_arn
 }
 
 # Define Notifications lambda function
@@ -155,6 +230,27 @@ module "notifications_lambda" {
     }
 }
 
+# Notifications lambda permission to send email via SES
+module "notifications_lambda_ses_permission" {
+    source = "./iam/policies/notifications-lambda-ses-policy"
+    ses_arn = module.notifications_ses.email_identity_arns[0]
+}
+
+# Attach the policy to the lambda execution role
+resource "aws_iam_role_policy_attachment" "notifications_lambda_ses_policy_attachment" {
+    role       = module.notifications_lambda.lambda_role_arn
+    policy_arn = module.notifications_lambda_ses_permission.policy_arn
+}
+
+# Notifications lambda permission to be invoked by EventBridge
+module "notifications_lambda_invoke_permission" {
+    source = "./iam/policies/lambda-invoke"
+    lambda_arn = module.notifications_lambda.lambda_arn
+    source_arn = module.event.event_bus_arn["blog-events-bus"]  
+    statementId = "AllowExecutionFromEventBridgeForNotificationsLambda"
+}
+
+
 # Define Cleanup lambda function
 # Trigger: EventBridge rule on post deletion
 
@@ -182,5 +278,25 @@ module "cleanup_lambda" {
         MEDIA_BUCKET = module.media_bucket.bucket_id,
         MEDIA_BUCKET_REGION = var.aws_region
     }
+}
 
+# Cleanup lambda permission for S3 access
+module "cleanup_lambda_s3_permission" {
+    source = "./iam/policies/cleanup-lambda-s3-permission"
+    bucket_arn = module.media_bucket.bucket_arn
+}
+
+# Attach the policy to the lambda execution role
+resource "aws_iam_role_policy_attachment" "cleanup_lambda_s3_policy_attachment" {
+    role       = module.cleanup_lambda.lambda_role_arn
+    policy_arn = module.cleanup_lambda_s3_permission.policy_arn
+}
+
+# cleanup Lambda invoke by event permission
+
+module "cleanup_lambda_invoke_permission" {
+    source = "./iam/policies/lambda-invoke"
+    lambda_arn = module.cleanup_lambda.lambda_arn
+    source_arn = module.event.event_bus_arn["blog-events-bus"]
+    statementId = "AllowExecutionFromEventBridgeForCleanupLambda"
 }

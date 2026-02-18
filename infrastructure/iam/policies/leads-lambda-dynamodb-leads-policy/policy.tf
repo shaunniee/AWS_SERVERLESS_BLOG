@@ -22,7 +22,8 @@ resource "aws_iam_policy" "leads_lambda_policy" {
             "dynamodb:Scan",
             "dynamodb:Query"
             ]
-            Resource = var.dynamodb_table_arn
+            Resource = [var.dynamodb_table_arn,
+              "${var.dynamodb_table_arn}/*"]
         }
         ]
     })

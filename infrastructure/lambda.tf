@@ -68,7 +68,8 @@ resource "aws_iam_role_policy_attachment" "admin_blog_posts_lambda_event_policy_
 module "admin_blog_posts_lambda_invoke_permission" {
     source = "./iam/policies/lambda-invoke"
     lambda_arn = module.admin_blog_posts_lambda.lambda_arn
-    source_arn = module.admin_api.rest_api_execution_arn
+    source_arn = "${module.admin_api.rest_api_execution_arn}/*/*"
+    principal = "apigateway.amazonaws.com"
     statementId = "AllowExecutionFromAPIGatewayForAdminBlogPostsLambda"
 }
 
@@ -120,7 +121,8 @@ resource "aws_iam_role_policy_attachment" "presign_lambda_policy_attachment" {
 module "presign_lambda_invoke_permission" {
     source = "./iam/policies/lambda-invoke"
     lambda_arn = module.presign_lambda.lambda_arn
-    source_arn = module.admin_api.rest_api_execution_arn
+    source_arn = "${module.admin_api.rest_api_execution_arn}/*/*"
+    principal = "apigateway.amazonaws.com"
     statementId = "AllowExecutionFromAPIGatewayForPresignLambda"
 }
 
@@ -170,7 +172,8 @@ resource "aws_iam_role_policy_attachment" "public_posts_lambda_policy_attachment
 module "public_posts_lambda_invoke_permission" {
     source = "./iam/policies/lambda-invoke"
     lambda_arn = module.public_posts_lambda.lambda_arn
-    source_arn = module.public_api.rest_api_execution_arn
+    source_arn = "${module.public_api.rest_api_execution_arn}/*/*"
+    principal = "apigateway.amazonaws.com"
     statementId = "AllowExecutionFromAPIGatewayForPublicPostsLambda"
 }
 
@@ -233,7 +236,8 @@ module "leads_lambda_admin_invoke_permission" {
 
     source = "./iam/policies/lambda-invoke"
     lambda_arn = module.leads_lambda.lambda_arn
-    source_arn = module.admin_api.rest_api_execution_arn
+    source_arn = "${module.admin_api.rest_api_execution_arn}/*/*"
+    principal = "apigateway.amazonaws.com"
     statementId = "AllowExecutionFromAPIGatewayForLeadsLambdaAdmin"
 }
 
@@ -241,7 +245,8 @@ module "leads_lambda_public_invoke_permission" {
 
     source = "./iam/policies/lambda-invoke"
     lambda_arn = module.leads_lambda.lambda_arn
-    source_arn = module.public_api.rest_api_execution_arn
+    source_arn = "${module.public_api.rest_api_execution_arn}/*/*"
+    principal = "apigateway.amazonaws.com"
     statementId = "AllowExecutionFromAPIGatewayForLeadsLambdaPublic"
 }
 
@@ -294,6 +299,7 @@ module "notifications_lambda_invoke_permission" {
     source = "./iam/policies/lambda-invoke"
     lambda_arn = module.notifications_lambda.lambda_arn
     source_arn = module.event.event_bus_arn["blog-events-bus"]  
+    principal = "events.amazonaws.com"
     statementId = "AllowExecutionFromEventBridgeForNotificationsLambda"
 }
 
@@ -362,6 +368,7 @@ module "cleanup_lambda_invoke_permission" {
     source = "./iam/policies/lambda-invoke"
     lambda_arn = module.cleanup_lambda.lambda_arn
     source_arn = module.event.event_bus_arn["blog-events-bus"]
+    principal = "events.amazonaws.com"
     statementId = "AllowExecutionFromEventBridgeForCleanupLambda"
 }
 

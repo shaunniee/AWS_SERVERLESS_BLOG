@@ -16,13 +16,18 @@ variable "statementId" {
     default     = ""
   
 }
+variable "principal" {
+    description = "Principal that is allowed to invoke the lambda function"
+    type        = string
+    default     = ""
+}
 
 resource "aws_lambda_permission" "eventBridgeInvoke" {
 
     statement_id  = var.statementId
     action        = "lambda:InvokeFunction"
     function_name = var.lambda_arn
-    principal     = "events.amazonaws.com"
+    principal     = var.principal
     source_arn    = var.source_arn
 }
 

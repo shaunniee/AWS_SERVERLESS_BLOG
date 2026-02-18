@@ -272,6 +272,9 @@ module "notifications_lambda" {
         FROM_EMAIL = "devsts14@gmail.com",
         TO_EMAIL = "devsts14@gmail.com"
     }
+        dead_letter_config = {
+            target_arn = module.notifications_dlq.queue_arn
+        }
 }
 
 # Notifications lambda permission to send email via SES
@@ -294,6 +297,20 @@ module "notifications_lambda_invoke_permission" {
     statementId = "AllowExecutionFromEventBridgeForNotificationsLambda"
 }
 
+# Notifications lambda permission to send messages to DLQ
+
+module "notifications_lambda_dlq_permission" {
+    policy_name = "${var.name_prefix}-NotificationsLambdaDLQPolicy"
+    source = "./iam/policies/notifications-lambda-dlq-policy"
+    dlq_arn = module.notifications_dlq.queue_arn
+}
+
+# Attach the policy to the lambda execution role
+
+resource "aws_iam_role_policy_attachment" "notifications_lambda_dlq_policy_attachment" {
+    role       = module.notifications_lambda.lambda_role_name
+    policy_arn = module.notifications_lambda_dlq_permission.policy_arn
+}
 
 # Define Cleanup lambda function
 # Trigger: EventBridge rule on post deletion
@@ -322,6 +339,9 @@ module "cleanup_lambda" {
         MEDIA_BUCKET = module.media_bucket.bucket_id,
         MEDIA_BUCKET_REGION = var.aws_region
     }
+    dead_letter_config = {
+        target_arn = module.cleanup_dlq.queue_arn
+     }
 }
 
 # Cleanup lambda permission for S3 access
@@ -343,4 +363,18 @@ module "cleanup_lambda_invoke_permission" {
     lambda_arn = module.cleanup_lambda.lambda_arn
     source_arn = module.event.event_bus_arn["blog-events-bus"]
     statementId = "AllowExecutionFromEventBridgeForCleanupLambda"
+}
+
+# Cleanup lambda permission to send messages to DLQ
+
+module "cleanup_lambda_dlq_permission" {
+    policy_name = "${var.name_prefix}-CleanupLambdaDLQPolicy"
+    source = "./iam/policies/cleanup-lambda-dlq-policy"
+    dlq_arn = module.cleanup_dlq.queue_arn
+}
+
+# Attach the policy to the lambda execution role
+resource "aws_iam_role_policy_attachment" "cleanup_lambda_dlq_policy_attachment" {
+    role       = module.cleanup_lambda.lambda_role_name
+    policy_arn = module.cleanup_lambda_dlq_permission.policy_arn
 }

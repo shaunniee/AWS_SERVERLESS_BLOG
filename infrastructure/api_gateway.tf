@@ -66,87 +66,101 @@ module "admin_api" {
     get_posts = {
       http_method   = "GET"
       resource_key  = "posts"
-  authorization = "NONE"
+     authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
     # POST /admin/posts
     create_post = {
       http_method   = "POST"
       resource_key  = "posts"
- authorization = "NONE"
+     authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
     # GET /admin/posts/{postId}
     get_post = {
       http_method   = "GET"
       resource_key  = "postId"
-       authorization = "NONE"
+           authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
     # PUT /admin/posts/{postId}
     update_post = {
       http_method   = "PUT"
       resource_key  = "postId"
-      authorization = "NONE"
+     authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
     # DELETE /admin/posts/{postId}
     delete_post = {
       http_method   = "DELETE"
       resource_key  = "postId"
-       authorization = "NONE"
+     authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
     # POST /admin/posts/{postId}/publish
     publish_post = {
       http_method   = "POST"
       resource_key  = "publish"
-       authorization = "NONE"
+         authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
     # POST /admin/posts/{postId}/unpublish
     unpublish_post = {
       http_method   = "POST"
       resource_key  = "unpublish"
-       authorization = "NONE"
+     authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
     # POST /admin/posts/{postId}/archive
     archive_post = {
       http_method   = "POST"
       resource_key  = "archive"
-      authorization = "NONE"
+     authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
     # POST /admin/posts/{postId}/unarchive
     unarchive_post = {
       http_method   = "POST"
       resource_key  = "unarchive"
-      authorization = "NONE"
+     authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
     # GET /admin/media/upload_url
     get_upload_url = {
       http_method   = "GET"
       resource_key  = "upload_url"
-       authorization = "NONE"
+     authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
     # GET /admin/leads
     get_leads = {
       http_method   = "GET"
       resource_key  = "leads"
-       authorization = "NONE"
+     authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
     # GET /admin/leads/{leadId}
     get_lead = {
       http_method   = "GET"
       resource_key  = "leadId"
-      authorization = "NONE"
+     authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
 
     # PUT /admin/leads/{leadId}
     update_lead = {
       http_method   = "PUT"
       resource_key  = "leadId"
-       authorization = "NONE"
+     authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
 
     # DELETE /admin/leads/{leadId}
     delete_lead = {
       http_method   = "DELETE"
       resource_key  = "leadId"
-      authorization = "NONE"
+     authorization = "COGNITO_USER_POOLS"
+     authorizer_id = module.cognito.user_pool_id
     }
 
     # CORS Preflight options for /admin/posts

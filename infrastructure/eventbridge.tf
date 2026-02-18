@@ -10,8 +10,8 @@ module "event" {
                 {
                     name = "leads-created-rule"
                     event_pattern = jsonencode({
-                        source = ["blog.leads"],
-                        "detail-type" = ["Lead Created"]
+                        source = ["app.leads"],
+                        "detail-type" = ["LeadCreated"]
                     })
                     targets = [
                         {
@@ -28,8 +28,8 @@ module "event" {
                 {
                     name = "posts-deleted-rule"
                     event_pattern = jsonencode({
-                        source = ["blog.posts"],
-                        "detail-type" = ["Post Deleted"]
+                        source = ["app.cleanup"],
+                        "detail-type" = ["PostDeleted"]
                     })
                     targets = [
                         {

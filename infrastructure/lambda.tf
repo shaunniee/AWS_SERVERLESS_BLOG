@@ -36,6 +36,7 @@ module "admin_blog_posts_lambda" {
 
     environment_variables = {
         POSTS_TABLE = module.posts_table.table_name
+        EVENT_BUS_NAME ="blog-events-bus"
     }
 }
 
@@ -203,6 +204,7 @@ module "leads_lambda" {
     ]
     environment_variables = {
         LEADS_TABLE = module.leads_table.table_name
+        LEADS_EVENT_BUS ="blog-events-bus"
     }
 }
 
@@ -277,9 +279,7 @@ module "notifications_lambda" {
         FROM_EMAIL = "devsts14@gmail.com",
         TO_EMAIL = "devsts14@gmail.com"
     }
-        dead_letter_config = {
-            target_arn = module.notifications_dlq.queue_arn
-        }
+   dead_letter_target_arn = module.notifications_dlq.queue_arn
 }
 
 # Notifications lambda permission to send email via SES
@@ -298,7 +298,7 @@ resource "aws_iam_role_policy_attachment" "notifications_lambda_ses_policy_attac
 module "notifications_lambda_invoke_permission" {
     source = "./iam/policies/lambda-invoke"
     lambda_arn = module.notifications_lambda.lambda_arn
-    source_arn = module.event.event_bus_arn["blog-events-bus"]  
+    source_arn = module.event.event_arn["blog-events-bus:leads-created-rule"]  
     principal = "events.amazonaws.com"
     statementId = "AllowExecutionFromEventBridgeForNotificationsLambda"
 }
@@ -345,11 +345,8 @@ module "cleanup_lambda" {
         MEDIA_BUCKET = module.media_bucket.bucket_id,
         MEDIA_BUCKET_REGION = var.aws_region
     }
-    dead_letter_config = {
-        target_arn = module.cleanup_dlq.queue_arn
-     }
+    dead_letter_target_arn = module.cleanup_dlq.queue_arn
 }
-
 # Cleanup lambda permission for S3 access
 module "cleanup_lambda_s3_permission" {
     source = "./iam/policies/cleanup-lambda-s3-permission"
@@ -367,7 +364,7 @@ resource "aws_iam_role_policy_attachment" "cleanup_lambda_s3_policy_attachment" 
 module "cleanup_lambda_invoke_permission" {
     source = "./iam/policies/lambda-invoke"
     lambda_arn = module.cleanup_lambda.lambda_arn
-    source_arn = module.event.event_bus_arn["blog-events-bus"]
+    source_arn = module.event.event_arn["blog-events-bus:posts-deleted-rule"]
     principal = "events.amazonaws.com"
     statementId = "AllowExecutionFromEventBridgeForCleanupLambda"
 }

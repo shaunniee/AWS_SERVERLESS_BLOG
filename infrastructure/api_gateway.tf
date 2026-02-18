@@ -4,6 +4,14 @@ module "admin_api" {
   source = "git::https://github.com/shaunniee/terraform_modules.git//aws_api_gateway_rest_api?ref=main"
   name   = "admin-api"
 
+  authorizers = {
+    cognito_user_pool = {
+      name                   = "cognito_user_pool"
+      type                   = "COGNITO_USER_POOLS"
+      provider_arns          = [module.cognito.user_pool_arn]
+    }
+  }
+
   resources = {
     # /admin
     admin = {
@@ -67,84 +75,84 @@ module "admin_api" {
       http_method   = "GET"
       resource_key  = "posts"
      authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+     authorizer_key = "cognito_user_pool"
     }
     # POST /admin/posts
     create_post = {
       http_method   = "POST"
       resource_key  = "posts"
      authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+     authorizer_key = "cognito_user_pool"
     }
     # GET /admin/posts/{postId}
     get_post = {
       http_method   = "GET"
       resource_key  = "postId"
            authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+     authorizer_key = "cognito_user_pool"
     }
     # PUT /admin/posts/{postId}
     update_post = {
       http_method   = "PUT"
       resource_key  = "postId"
      authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+      authorizer_key = "cognito_user_pool"
     }
     # DELETE /admin/posts/{postId}
     delete_post = {
       http_method   = "DELETE"
       resource_key  = "postId"
      authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+     authorizer_key = "cognito_user_pool"
     }
     # POST /admin/posts/{postId}/publish
     publish_post = {
       http_method   = "POST"
       resource_key  = "publish"
          authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+     authorizer_key = "cognito_user_pool"
     }
     # POST /admin/posts/{postId}/unpublish
     unpublish_post = {
       http_method   = "POST"
       resource_key  = "unpublish"
      authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+     authorizer_key = "cognito_user_pool"
     }
     # POST /admin/posts/{postId}/archive
     archive_post = {
       http_method   = "POST"
       resource_key  = "archive"
      authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+     authorizer_key = "cognito_user_pool"
     }
     # POST /admin/posts/{postId}/unarchive
     unarchive_post = {
       http_method   = "POST"
       resource_key  = "unarchive"
      authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+     authorizer_key = "cognito_user_pool"
     }
     # GET /admin/media/upload_url
     get_upload_url = {
       http_method   = "GET"
       resource_key  = "upload_url"
      authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+     authorizer_key = "cognito_user_pool"
     }
     # GET /admin/leads
     get_leads = {
       http_method   = "GET"
       resource_key  = "leads"
      authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+     authorizer_key = "cognito_user_pool"
     }
     # GET /admin/leads/{leadId}
     get_lead = {
       http_method   = "GET"
       resource_key  = "leadId"
      authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+     authorizer_key = "cognito_user_pool"
     }
 
     # PUT /admin/leads/{leadId}
@@ -152,7 +160,7 @@ module "admin_api" {
       http_method   = "PUT"
       resource_key  = "leadId"
      authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+     authorizer_key = "cognito_user_pool"
     }
 
     # DELETE /admin/leads/{leadId}
@@ -160,7 +168,7 @@ module "admin_api" {
       http_method   = "DELETE"
       resource_key  = "leadId"
      authorization = "COGNITO_USER_POOLS"
-     authorizer_id = module.cognito.user_pool_id
+     authorizer_key = "cognito_user_pool"
     }
 
     # CORS Preflight options for /admin/posts

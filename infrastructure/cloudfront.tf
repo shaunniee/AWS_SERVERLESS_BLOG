@@ -23,7 +23,7 @@ JS
 }
 
 module "cloudfront_public" {
-  source            = "./aws_cloudfront"
+  source            = "git::https://github.com/shaunniee/terraform_modules.git//aws_cloudfront?ref=main"
   distribution_name = "${var.name_prefix}-public-distribution"
 
   origins = {
@@ -135,7 +135,7 @@ JS
 
 
 module "cloudfront_admin" {
-  source            = "./aws_cloudfront"
+  source            = "git::https://github.com/shaunniee/terraform_modules.git//aws_cloudfront?ref=main"
   distribution_name = "${var.name_prefix}-admin-distribution"
 
   origins = {

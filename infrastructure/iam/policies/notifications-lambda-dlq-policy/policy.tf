@@ -12,7 +12,7 @@ variable "dlq_arn" {
 }
 
 resource "aws_iam_policy" "notifications_dlq_policy" {
-  name        = policy_name
+  name        = var.policy_name
   description = "Policy for Notifications Lambda to send messages to DLQ"
   policy      = jsonencode({
     Version = "2012-10-17",
@@ -28,5 +28,10 @@ resource "aws_iam_policy" "notifications_dlq_policy" {
       }
     ]
   })
+  
+}
+
+output "policy_arn" {
+  value = aws_iam_policy.notifications_dlq_policy.arn
   
 }

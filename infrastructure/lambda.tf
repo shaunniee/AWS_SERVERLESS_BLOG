@@ -23,6 +23,10 @@ module "admin_blog_posts_lambda" {
     publish = true
     create_cloudwatch_log_group = true
     log_retention_in_days       = 14
+    trace_mode = "Active"
+    enable_tracing_permissions = true
+    enable_monitoring_permissions = true
+
     aliases ={
         live={
             description = "Live alias for admin_blog_posts"

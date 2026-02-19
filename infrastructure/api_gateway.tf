@@ -3,6 +3,60 @@
 module "admin_api" {
   source = "git::https://github.com/shaunniee/terraform_modules.git//aws_api_gateway_rest_api?ref=main"
   name   = "admin-api"
+    access_log_enabled       = true
+  create_access_log_group  = true
+  access_log_retention_in_days = 7
+  xray_tracing_enabled = true
+  enable_logging_permissions = true
+  enable_monitoring_permissions = true
+  enable_tracing_permissions = true
+  manage_account_cloudwatch_role = true
+
+  cloudwatch_metric_alarms = {
+    high_4xx = {
+  metric_name         = "4XXError"
+  statistic           = "Sum"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = 25
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [module.cw_sns.sns_topic_arn]
+}
+
+high_5xx = {
+  metric_name         = "5XXError"
+  statistic           = "Sum"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = 10
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [module.cw_sns.sns_topic_arn]
+}
+
+high_latency = {
+  metric_name         = "Latency"
+  statistic           = "Average"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = 1000
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [module.cw_sns.sns_topic_arn]
+}
+
+high_integration_latency = {
+  metric_name         = "IntegrationLatency"
+  statistic           = "Average"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = 800
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [module.cw_sns.sns_topic_arn]
+}
+  }
 
   authorizers = {
     cognito_user_pool = {
@@ -434,7 +488,7 @@ module "admin_api" {
       response_parameters = {
         "method.response.header.Access-Control-Allow-Origin"  = "'*'"
         "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
-        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
       }
     }
 
@@ -443,7 +497,7 @@ module "admin_api" {
       response_parameters = {
         "method.response.header.Access-Control-Allow-Origin"  = "'*'"
         "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,DELETE,OPTIONS'"
-        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
       }
     }
 
@@ -452,7 +506,7 @@ module "admin_api" {
       response_parameters = {
         "method.response.header.Access-Control-Allow-Origin"  = "'*'"
         "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
-        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
       }
     }
 
@@ -461,7 +515,7 @@ module "admin_api" {
       response_parameters = {
         "method.response.header.Access-Control-Allow-Origin"  = "'*'"
         "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,DELETE,OPTIONS'"
-        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
       }
     }
 
@@ -470,7 +524,7 @@ module "admin_api" {
       response_parameters = {
         "method.response.header.Access-Control-Allow-Origin"  = "'*'"
         "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,DELETE,OPTIONS'"
-        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
       }
     }
   }
@@ -483,6 +537,60 @@ module "admin_api" {
 module "public_api" {
   source = "git::https://github.com/shaunniee/terraform_modules.git//aws_api_gateway_rest_api?ref=main"
   name   = "public-api"
+      access_log_enabled       = true
+  create_access_log_group  = true
+  access_log_retention_in_days = 7
+  xray_tracing_enabled = true
+  enable_logging_permissions = true
+  enable_monitoring_permissions = true
+  enable_tracing_permissions = true
+  manage_account_cloudwatch_role = true
+
+  cloudwatch_metric_alarms = {
+    high_4xx = {
+  metric_name         = "4XXError"
+  statistic           = "Sum"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = 25
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [module.cw_sns.sns_topic_arn]
+}
+
+high_5xx = {
+  metric_name         = "5XXError"
+  statistic           = "Sum"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = 10
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [module.cw_sns.sns_topic_arn]
+}
+
+high_latency = {
+  metric_name         = "Latency"
+  statistic           = "Average"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = 1000
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [module.cw_sns.sns_topic_arn]
+}
+
+high_integration_latency = {
+  metric_name         = "IntegrationLatency"
+  statistic           = "Average"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = 800
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [module.cw_sns.sns_topic_arn]
+}
+  }
   resources = {
     # /posts
     posts = {
@@ -640,7 +748,7 @@ method_responses = {
       response_parameters = {
         "method.response.header.Access-Control-Allow-Origin"  = "'*'"
         "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
-        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
       }
     }
 
@@ -649,7 +757,7 @@ method_responses = {
       response_parameters = {
         "method.response.header.Access-Control-Allow-Origin"  = "'*'"
         "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
-        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
       }
     }
 
@@ -658,7 +766,7 @@ method_responses = {
       response_parameters = {
         "method.response.header.Access-Control-Allow-Origin"  = "'*'"
         "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
-        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
       }
     }
   }

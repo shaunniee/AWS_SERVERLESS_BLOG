@@ -21,6 +21,8 @@ module "admin_blog_posts_lambda" {
     runtime = "nodejs18.x"
     filename = "../backend/admin_blog_post/blog_posts.zip"
     publish = true
+    create_cloudwatch_log_group = true
+    log_retention_in_days       = 14
     aliases ={
         live={
             description = "Live alias for admin_blog_posts"
@@ -85,6 +87,8 @@ module "presign_lambda" {
     runtime = "nodejs18.x"
     filename = "../backend/presign_lambda/presign_lambda.zip"
     publish = true
+    create_cloudwatch_log_group = true
+    log_retention_in_days       = 14
     aliases ={
         live={
             description = "Live alias for presign_lambda"
@@ -138,6 +142,8 @@ module "public_posts_lambda" {
     runtime = "nodejs18.x"
     filename = "../backend/public_posts_lambda/public_posts_lambda.zip"
     publish = true
+        create_cloudwatch_log_group = true
+    log_retention_in_days       = 14
     aliases ={
         live={
             description = "Live alias for public_posts_lambda"
@@ -190,6 +196,8 @@ module "leads_lambda" {
     runtime = "nodejs18.x"
     filename = "../backend/leads_lambda/leads_lambda.zip"
     publish = true
+        create_cloudwatch_log_group = true
+    log_retention_in_days       = 14
     aliases ={
         live={
             description = "Live alias for leads_lambda"
@@ -263,6 +271,8 @@ module "notifications_lambda" {
     runtime = "nodejs18.x"
     filename = "../backend/notifications_lambda/notifications_lambda.zip"
     publish = true
+        create_cloudwatch_log_group = true
+    log_retention_in_days       = 14
     aliases ={
         live={
             description = "Live alias for notifications_lambda"
@@ -329,6 +339,9 @@ module "cleanup_lambda" {
     runtime = "nodejs18.x"
     filename = "../backend/cleanup_lambda/cleanup_lambda.zip"
     publish = true
+
+        create_cloudwatch_log_group = true
+    log_retention_in_days       = 14
     aliases ={
         live={
             description = "Live alias for cleanup_lambda"

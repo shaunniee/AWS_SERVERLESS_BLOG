@@ -16,8 +16,6 @@ const TABLE = process.env.POSTS_TABLE;
 const { EventBridgeClient, PutEventsCommand } = require("@aws-sdk/client-eventbridge");
 const eventbridge = new EventBridgeClient({});
 
-
-
 const now = () => Date.now();
 
 const normalizeObjectKey = (value = "") => String(value).replace(/^\/+/, "").trim();

@@ -36,6 +36,19 @@ module "admin_blog_posts_lambda" {
     }
   }
 
+  allowed_triggers = {
+    adminApiGatewayTrigger = {
+      principal  = "apigateway.amazonaws.com"
+      source_arn = "${module.admin_api.rest_api_execution_arn}/*/*"
+      qualifier  = "live"
+    }
+
+  }
+  additional_policy_arns = [
+    module.admin_blog_posts_lambda_permission.policy_arn,
+    module.admin_blog_posts_lambda_event_permission.policy_arn,
+  ]
+
   layers = [
     module.lambda_layer.layer_arn
   ]
@@ -44,43 +57,25 @@ module "admin_blog_posts_lambda" {
     POSTS_TABLE    = module.posts_table.table_name
     EVENT_BUS_NAME = "blog-events-bus"
   }
-  metric_alarms = {
-    errors = {
-      comparison_operator = "GreaterThanOrEqualToThreshold"
-      evaluation_periods  = 1
-      metric_name         = "Errors"
-      period              = 60
-      statistic           = "Sum"
-      threshold           = 1
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
 
-    throttles = {
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = 1
-      metric_name         = "Throttles"
-      period              = 60
-      statistic           = "Sum"
-      threshold           = 0
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
-
-    duration_p95 = {
-      alarm_name          = "orders-processor-duration-p95"
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = 3
-      metric_name         = "Duration"
-      period              = 60
-      extended_statistic  = "p95"
-      threshold           = 500
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
+  observability = {
+    enabled                      = true
+    enable_default_alarms        = true
+    default_alarm_actions        = [module.cw_sns.topic_arn]
   }
 
+  log_metric_filters = {
+    errors = {
+      pattern          = "\"ERROR\""
+      metric_namespace = "Custom/AdminBlogPostsLambda"
+      metric_name      = "ErrorLogs"
+    }
+  }
 }
+
+##########################################################
+# Permissions for admin blog posts lambda
+#########################################################
 
 # Admin blog lambda permission and permission boundry
 
@@ -89,47 +84,20 @@ module "admin_blog_posts_lambda_permission" {
   dynamodb_table_arn = module.posts_table.table_arn
 }
 
-# Attach the policy to the lambda execution role
-
-resource "aws_iam_role_policy_attachment" "admin_blog_posts_lambda_policy_attachment" {
-  role       = module.admin_blog_posts_lambda.lambda_role_name
-  policy_arn = module.admin_blog_posts_lambda_permission.policy_arn
-}
 # Admin blog lambda permission to send event to EventBridge
 module "admin_blog_posts_lambda_event_permission" {
   source              = "./iam/policies/admin-lambda-event-policy"
-  eventbridge_bus_arn = module.event.event_bus_arn["blog-events-bus"]
+  eventbridge_bus_arn = module.event.event_bus_arns["blog-events-bus"]
 }
 
-# Attach the policy to the lambda execution role
-resource "aws_iam_role_policy_attachment" "admin_blog_posts_lambda_event_policy_attachment" {
-  role       = module.admin_blog_posts_lambda.lambda_role_name
-  policy_arn = module.admin_blog_posts_lambda_event_permission.policy_arn
-}
-# Admin lambda invoke my admin api
+########################################################
+########################################################
 
-module "admin_blog_posts_lambda_invoke_permission" {
-  source      = "./iam/policies/lambda-invoke"
-  lambda_arn  = module.admin_blog_posts_lambda.lambda_arn
-  source_arn  = "${module.admin_api.rest_api_execution_arn}/*/*"
-  principal   = "apigateway.amazonaws.com"
-  statementId = "AllowExecutionFromAPIGatewayForAdminBlogPostsLambda"
-}
 
-#  Define Xray permissions for admin lambda
-module "admin_blog_posts_lambda_xray_permission" {
-  source = "./iam/policies/admin-lambda-xray-policy"
-}
-
-# Attach the Xray policy to the lambda execution role
-resource "aws_iam_role_policy_attachment" "admin_blog_posts_lambda_xray_policy_attachment" {
-  role       = module.admin_blog_posts_lambda.lambda_role_name
-  policy_arn = module.admin_blog_posts_lambda_xray_permission.policy_arn
-}
-
+#######################################################
 # Define S3 presigned URL lambda function
 # Routes: POST /media/upload_url
-
+######################################################
 module "presign_lambda" {
   source                        = "git::https://github.com/shaunniee/terraform_modules.git//aws_lambda?ref=main"
   function_name                 = "presign_lambda"
@@ -144,41 +112,32 @@ module "presign_lambda" {
   enable_tracing_permissions    = true
   enable_monitoring_permissions = true
 
-    metric_alarms = {
-    errors = {
-      comparison_operator = "GreaterThanOrEqualToThreshold"
-      evaluation_periods  = 1
-      metric_name         = "Errors"
-      period              = 60
-      statistic           = "Sum"
-      threshold           = 1
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
+  observability = {
+    enabled                      = true
+    enable_default_alarms        = true
+    default_alarm_actions        = [module.cw_sns.topic_arn]
+  }
 
-    throttles = {
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = 1
-      metric_name         = "Throttles"
-      period              = 60
-      statistic           = "Sum"
-      threshold           = 0
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
-
-    duration_p95 = {
-      alarm_name          = "orders-processor-duration-p95"
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = 3
-      metric_name         = "Duration"
-      period              = 60
-      extended_statistic  = "p95"
-      threshold           = 500
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
+  allowed_triggers = {
+    api_gateway = {
+      principal  = "apigateway.amazonaws.com"
+      source_arn = "${module.admin_api.rest_api_execution_arn}/*/*"
+      qualifier  = "live"
     }
   }
+
+  additional_policy_arns = [
+    module.presign_lambda_permissions.policy_arn
+  ]
+
+  log_metric_filters = {
+    errors = {
+      pattern          = "\"ERROR\""
+      metric_namespace = "Custom/PresignLambda"
+      metric_name      = "ErrorLogs"
+    }
+  }
+
   aliases = {
     live = {
       description = "Live alias for presign_lambda"
@@ -198,32 +157,25 @@ module "presign_lambda" {
   }
 }
 
+
+############################################################
+# Permissions for presign lambda
+#############################################################
+
 # Presign lambda permission for presigned url PUT
 
 module "presign_lambda_permissions" {
   source        = "./iam/policies/presign-lambda-policy"
   s3_bucket_arn = module.media_bucket.bucket_arn
 }
-
-# Attach the policy to the lambda execution role
-resource "aws_iam_role_policy_attachment" "presign_lambda_policy_attachment" {
-  role       = module.presign_lambda.lambda_role_name
-  policy_arn = module.presign_lambda_permissions.policy_arn
-}
-
-# Presign lambda invoke by api gateway permission
-
-module "presign_lambda_invoke_permission" {
-  source      = "./iam/policies/lambda-invoke"
-  lambda_arn  = module.presign_lambda.lambda_arn
-  source_arn  = "${module.admin_api.rest_api_execution_arn}/*/*"
-  principal   = "apigateway.amazonaws.com"
-  statementId = "AllowExecutionFromAPIGatewayForPresignLambda"
-}
+#############################################################
+#############################################################
 
 
+############################################################
 # Define Public read lambda function
 # Routes: GET /posts, GET /posts/{id}
+############################################################
 
 module "public_posts_lambda" {
   source                        = "git::https://github.com/shaunniee/terraform_modules.git//aws_lambda?ref=main"
@@ -239,41 +191,32 @@ module "public_posts_lambda" {
   enable_tracing_permissions    = true
   enable_monitoring_permissions = true
 
-    metric_alarms = {
+  observability = {
+    enabled                      = true
+    enable_default_alarms        = true
+    default_alarm_actions        = [module.cw_sns.topic_arn]
+  }
+
+  allowed_triggers = {
+    api_gateway = {
+      principal  = "apigateway.amazonaws.com"
+      source_arn = "${module.public_api.rest_api_execution_arn}/*/*"
+      qualifier  = "live"
+    }
+
+  }
+
+  log_metric_filters = {
     errors = {
-      comparison_operator = "GreaterThanOrEqualToThreshold"
-      evaluation_periods  = 1
-      metric_name         = "Errors"
-      period              = 60
-      statistic           = "Sum"
-      threshold           = 1
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
-
-    throttles = {
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = 1
-      metric_name         = "Throttles"
-      period              = 60
-      statistic           = "Sum"
-      threshold           = 0
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
-
-    duration_p95 = {
-      alarm_name          = "orders-processor-duration-p95"
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = 3
-      metric_name         = "Duration"
-      period              = 60
-      extended_statistic  = "p95"
-      threshold           = 500
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
+      pattern          = "\"ERROR\""
+      metric_namespace = "Custom/PublicPostsLambda"
+      metric_name      = "ErrorLogs"
     }
   }
+
+  additional_policy_arns = [
+    module.public_posts_lambda_permissions.policy_arn
+  ]
   aliases = {
     live = {
       description = "Live alias for public_posts_lambda"
@@ -291,6 +234,10 @@ module "public_posts_lambda" {
   }
 }
 
+############################################################
+# Permissions for public posts lambda
+############################################################
+
 # Public posts lambda permission for read only access to DynamoDB
 
 module "public_posts_lambda_permissions" {
@@ -298,26 +245,13 @@ module "public_posts_lambda_permissions" {
   dynamodb_table_arn = module.posts_table.table_arn
 }
 
-# Attach the policy to the lambda execution role
-resource "aws_iam_role_policy_attachment" "public_posts_lambda_policy_attachment" {
-  role       = module.public_posts_lambda.lambda_role_name
-  policy_arn = module.public_posts_lambda_permissions.policy_arn
-}
+############################################################
+############################################################
 
-# Public posts lambda invoke by api gateway permission
-
-module "public_posts_lambda_invoke_permission" {
-  source      = "./iam/policies/lambda-invoke"
-  lambda_arn  = module.public_posts_lambda.lambda_arn
-  source_arn  = "${module.public_api.rest_api_execution_arn}/*/*"
-  principal   = "apigateway.amazonaws.com"
-  statementId = "AllowExecutionFromAPIGatewayForPublicPostsLambda"
-}
-
-
+############################################################
 # Define Leads lambda function
 # Routes: POST /leads, GET /admin/leads, GET /admin/leads/{id}, DELETE /admin/leads/{id} ,PUT /admin/leads/{id}
-
+##########################################################
 module "leads_lambda" {
   source                        = "git::https://github.com/shaunniee/terraform_modules.git//aws_lambda?ref=main"
   function_name                 = "leads_lambda"
@@ -332,39 +266,33 @@ module "leads_lambda" {
   enable_tracing_permissions    = true
   enable_monitoring_permissions = true
 
-    metric_alarms = {
+  observability = {
+    enabled                      = true
+    enable_default_alarms        = true
+    default_alarm_actions        = [module.cw_sns.topic_arn]
+  }
+
+  allowed_triggers   = {
+    adminApiGatewayTrigger = {
+      principal  = "apigateway.amazonaws.com"
+      source_arn = "${module.admin_api.rest_api_execution_arn}/*/*"
+      qualifier  = "live"
+    },
+    publicApiGatewayTrigger = {
+      principal  = "apigateway.amazonaws.com"
+      source_arn = "${module.public_api.rest_api_execution_arn}/*/*"
+      qualifier  = "live"
+    }
+  }
+additional_policy_arns = [
+    module.leads_lambda_permissions.policy_arn,
+    module.leads_lambda_event_permission.policy_arn,
+  ]
+  log_metric_filters = {
     errors = {
-      comparison_operator = "GreaterThanOrEqualToThreshold"
-      evaluation_periods  = 1
-      metric_name         = "Errors"
-      period              = 60
-      statistic           = "Sum"
-      threshold           = 1
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
-
-    throttles = {
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = 1
-      metric_name         = "Throttles"
-      period              = 60
-      statistic           = "Sum"
-      threshold           = 0
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
-
-    duration_p95 = {
-      alarm_name          = "orders-processor-duration-p95"
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = 3
-      metric_name         = "Duration"
-      period              = 60
-      extended_statistic  = "p95"
-      threshold           = 500
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
+      pattern          = "\"ERROR\""
+      metric_namespace = "Custom/LeadsLambda"
+      metric_name      = "ErrorLogs"
     }
   }
   aliases = {
@@ -385,52 +313,30 @@ module "leads_lambda" {
   }
 }
 
+############################################################
+# Permissions for leads lambda
+############################################################
+
 # Leads lambda permission for access to DynamoDB
 module "leads_lambda_permissions" {
   source             = "./iam/policies/leads-lambda-dynamodb-leads-policy"
   dynamodb_table_arn = module.leads_table.table_arn
 }
 
-# Attach the policy to the lambda execution role
-resource "aws_iam_role_policy_attachment" "leads_lambda_policy_attachment" {
-  role       = module.leads_lambda.lambda_role_name
-  policy_arn = module.leads_lambda_permissions.policy_arn
-}
-
 # Leads lambda permission to send event to EventBridge
 module "leads_lambda_event_permission" {
   source              = "./iam/policies/leads-lambda-event-policy"
-  eventbridge_bus_arn = module.event.event_bus_arn["blog-events-bus"]
+  eventbridge_bus_arn = module.event.event_bus_arns["blog-events-bus"]
 }
 
-# Attach the policy to the lambda execution role
-resource "aws_iam_role_policy_attachment" "leads_lambda_event_policy_attachment" {
-  role       = module.leads_lambda.lambda_role_name
-  policy_arn = module.leads_lambda_event_permission.policy_arn
-}
+#############################################################
+#############################################################
 
-# leads lambda to be invoked by both admin and public api
 
-module "leads_lambda_admin_invoke_permission" {
-
-  source      = "./iam/policies/lambda-invoke"
-  lambda_arn  = module.leads_lambda.lambda_arn
-  source_arn  = "${module.admin_api.rest_api_execution_arn}/*/*"
-  principal   = "apigateway.amazonaws.com"
-  statementId = "AllowExecutionFromAPIGatewayForLeadsLambdaAdmin"
-}
-
-module "leads_lambda_public_invoke_permission" {
-
-  source      = "./iam/policies/lambda-invoke"
-  lambda_arn  = module.leads_lambda.lambda_arn
-  source_arn  = "${module.public_api.rest_api_execution_arn}/*/*"
-  principal   = "apigateway.amazonaws.com"
-  statementId = "AllowExecutionFromAPIGatewayForLeadsLambdaPublic"
-}
-
+################################################################
 # Define Notifications lambda function
 # Trigger: EventBridge rule on new lead creation
+###############################################################
 
 module "notifications_lambda" {
   source                        = "git::https://github.com/shaunniee/terraform_modules.git//aws_lambda?ref=main"
@@ -446,7 +352,28 @@ module "notifications_lambda" {
   enable_tracing_permissions    = true
   enable_monitoring_permissions = true
 
-    dlq_cloudwatch_metric_alarms = {
+  allowed_triggers = {
+    eventbridgeTrigger = {
+      principal  = "events.amazonaws.com"
+      source_arn = "${module.event.event_rule_arns["blog-events-bus:leads-created-rule"]}"
+      qualifier  = "live"
+    }
+  }
+
+  additional_policy_arns = [
+    module.notifications_lambda_ses_permission.policy_arn,
+    module.notifications_lambda_dlq_permission.policy_arn
+  ]
+
+  observability = {
+    enabled                      = true
+    enable_default_alarms        = true
+    default_alarm_actions        = [module.cw_sns.topic_arn]
+  }
+
+
+
+  dlq_cloudwatch_metric_alarms = {
     dlq_visible_messages = {
       comparison_operator = "GreaterThanOrEqualToThreshold"
       evaluation_periods  = 1
@@ -455,7 +382,7 @@ module "notifications_lambda" {
       statistic           = "Maximum"
       threshold           = 1
       treat_missing_data  = "notBreaching"
-      alarm_actions       = ["arn:aws:sns:us-east-1:123456789012:ops-alerts"]
+      alarm_actions       = [module.cw_sns.topic_arn]
     }
 
     dlq_oldest_message_age = {
@@ -466,54 +393,20 @@ module "notifications_lambda" {
       statistic           = "Maximum"
       threshold           = 300
       treat_missing_data  = "notBreaching"
-      alarm_actions       = ["arn:aws:sns:us-east-1:123456789012:ops-alerts"]
+      alarm_actions       = [module.cw_sns.topic_arn]
     }
   }
 
   dlq_log_metric_filters = {
     async_dlq_delivery_failures = {
       pattern          = "\"DeadLetterErrors\""
-      metric_namespace = "Notification/LambdaDLQ"
+      metric_namespace = "Custom/NotificationsLambdaDLQ"
       metric_name      = "DeadLetterErrorsFromLogs"
     }
   }
 
 
-    metric_alarms = {
-    errors = {
-      comparison_operator = "GreaterThanOrEqualToThreshold"
-      evaluation_periods  = 1
-      metric_name         = "Errors"
-      period              = 60
-      statistic           = "Sum"
-      threshold           = 1
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
 
-    throttles = {
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = 1
-      metric_name         = "Throttles"
-      period              = 60
-      statistic           = "Sum"
-      threshold           = 0
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
-
-    duration_p95 = {
-      alarm_name          = "orders-processor-duration-p95"
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = 3
-      metric_name         = "Duration"
-      period              = 60
-      extended_statistic  = "p95"
-      threshold           = 500
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
-  }
   aliases = {
     live = {
       description = "Live alias for notifications_lambda"
@@ -532,26 +425,14 @@ module "notifications_lambda" {
   }
   dead_letter_target_arn = module.notifications_dlq.queue_arn
 }
+#############################################################
+# Permissions for notifications lambda
+#############################################################
 
 # Notifications lambda permission to send email via SES
 module "notifications_lambda_ses_permission" {
   source  = "./iam/policies/notifications-lambda-ses-policy"
   ses_arn = module.notifications_ses.email_identity_arns["devsts14@gmail.com"]
-}
-
-# Attach the policy to the lambda execution role
-resource "aws_iam_role_policy_attachment" "notifications_lambda_ses_policy_attachment" {
-  role       = module.notifications_lambda.lambda_role_name
-  policy_arn = module.notifications_lambda_ses_permission.policy_arn
-}
-
-# Notifications lambda permission to be invoked by EventBridge
-module "notifications_lambda_invoke_permission" {
-  source      = "./iam/policies/lambda-invoke"
-  lambda_arn  = module.notifications_lambda.lambda_arn
-  source_arn  = module.event.event_arn["blog-events-bus:leads-created-rule"]
-  principal   = "events.amazonaws.com"
-  statementId = "AllowExecutionFromEventBridgeForNotificationsLambda"
 }
 
 # Notifications lambda permission to send messages to DLQ
@@ -562,15 +443,14 @@ module "notifications_lambda_dlq_permission" {
   dlq_arn     = module.notifications_dlq.queue_arn
 }
 
-# Attach the policy to the lambda execution role
+############################################################
+############################################################
 
-resource "aws_iam_role_policy_attachment" "notifications_lambda_dlq_policy_attachment" {
-  role       = module.notifications_lambda.lambda_role_name
-  policy_arn = module.notifications_lambda_dlq_permission.policy_arn
-}
 
+############################################################
 # Define Cleanup lambda function
 # Trigger: EventBridge rule on post deletion
+############################################################
 
 module "cleanup_lambda" {
   source        = "git::https://github.com/shaunniee/terraform_modules.git//aws_lambda?ref=main"
@@ -587,43 +467,26 @@ module "cleanup_lambda" {
   enable_tracing_permissions    = true
   enable_monitoring_permissions = true
 
-    metric_alarms = {
-    errors = {
-      comparison_operator = "GreaterThanOrEqualToThreshold"
-      evaluation_periods  = 1
-      metric_name         = "Errors"
-      period              = 60
-      statistic           = "Sum"
-      threshold           = 1
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
-
-    throttles = {
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = 1
-      metric_name         = "Throttles"
-      period              = 60
-      statistic           = "Sum"
-      threshold           = 0
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
-    }
-
-    duration_p95 = {
-      alarm_name          = "orders-processor-duration-p95"
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = 3
-      metric_name         = "Duration"
-      period              = 60
-      extended_statistic  = "p95"
-      threshold           = 500
-      treat_missing_data  = "notBreaching"
-      alarm_actions       = [module.cw_sns.sns_topic_arn]
+  allowed_triggers = {
+    eventbridgeTrigger = {
+      principal  = "events.amazonaws.com"
+      source_arn = "${module.event.event_rule_arns["blog-events-bus:posts-deleted-rule"]}"
+      qualifier  = "live"
     }
   }
 
-    dlq_cloudwatch_metric_alarms = {
+  additional_policy_arns = [
+    module.cleanup_lambda_s3_permission.policy_arn,
+    module.cleanup_lambda_dlq_permission.policy_arn,
+  ]
+
+  observability = {
+    enabled                      = true
+    enable_default_alarms        = true
+    default_alarm_actions        = [module.cw_sns.topic_arn]
+  }
+
+  dlq_cloudwatch_metric_alarms = {
     dlq_visible_messages = {
       comparison_operator = "GreaterThanOrEqualToThreshold"
       evaluation_periods  = 1
@@ -632,7 +495,7 @@ module "cleanup_lambda" {
       statistic           = "Maximum"
       threshold           = 1
       treat_missing_data  = "notBreaching"
-      alarm_actions       = ["arn:aws:sns:us-east-1:123456789012:ops-alerts"]
+          alarm_actions       = [module.cw_sns.topic_arn]
     }
 
     dlq_oldest_message_age = {
@@ -643,15 +506,7 @@ module "cleanup_lambda" {
       statistic           = "Maximum"
       threshold           = 300
       treat_missing_data  = "notBreaching"
-      alarm_actions       = ["arn:aws:sns:us-east-1:123456789012:ops-alerts"]
-    }
-  }
-
-  dlq_log_metric_filters = {
-    async_dlq_delivery_failures = {
-      pattern          = "\"DeadLetterErrors\""
-      metric_namespace = "Cleanup/LambdaDLQ"
-      metric_name      = "DeadLetterErrorsFromLogs"
+      alarm_actions       = [module.cw_sns.topic_arn]
     }
   }
 
@@ -673,26 +528,16 @@ module "cleanup_lambda" {
   }
   dead_letter_target_arn = module.cleanup_dlq.queue_arn
 }
+
+
+###############################################################
+# Permissions for cleanup lambda
+###############################################################
+
 # Cleanup lambda permission for S3 access
 module "cleanup_lambda_s3_permission" {
   source     = "./iam/policies/cleanup-lambda-s3-permission"
   bucket_arn = module.media_bucket.bucket_arn
-}
-
-# Attach the policy to the lambda execution role
-resource "aws_iam_role_policy_attachment" "cleanup_lambda_s3_policy_attachment" {
-  role       = module.cleanup_lambda.lambda_role_name
-  policy_arn = module.cleanup_lambda_s3_permission.policy_arn
-}
-
-# cleanup Lambda invoke by event permission
-
-module "cleanup_lambda_invoke_permission" {
-  source      = "./iam/policies/lambda-invoke"
-  lambda_arn  = module.cleanup_lambda.lambda_arn
-  source_arn  = module.event.event_arn["blog-events-bus:posts-deleted-rule"]
-  principal   = "events.amazonaws.com"
-  statementId = "AllowExecutionFromEventBridgeForCleanupLambda"
 }
 
 # Cleanup lambda permission to send messages to DLQ
@@ -703,8 +548,5 @@ module "cleanup_lambda_dlq_permission" {
   dlq_arn     = module.cleanup_dlq.queue_arn
 }
 
-# Attach the policy to the lambda execution role
-resource "aws_iam_role_policy_attachment" "cleanup_lambda_dlq_policy_attachment" {
-  role       = module.cleanup_lambda.lambda_role_name
-  policy_arn = module.cleanup_lambda_dlq_permission.policy_arn
-}
+#################################################################
+#############################################################

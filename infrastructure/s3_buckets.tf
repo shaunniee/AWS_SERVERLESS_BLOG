@@ -30,6 +30,10 @@ module "media_bucket" {
         {
             id = "version-lifecycle-rule"
             enabled = true
+            filter = {
+                prefix = null
+                tag    = null
+            }
             noncurrent_version_expiration = [{
                 noncurrent_days = 365
             }]

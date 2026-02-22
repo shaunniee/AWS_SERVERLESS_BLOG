@@ -1,0 +1,16 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+  build:
+    commands:
+      - cd "$CODEBUILD_SRC_DIR/public-frontend"
+      - npm install
+      - npm run build
+  post_build:
+    commands:
+      - cd "$CODEBUILD_SRC_DIR/public-frontend"
+      - aws s3 sync dist/ "s3://${S3_BUCKET}" --delete
+      - aws cloudfront create-invalidation --distribution-id "${CF_DISTRIBUTION_ID}" --paths "/*"

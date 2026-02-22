@@ -87,6 +87,14 @@ module "cloudfront_public" {
       origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
     }
   }
+
+
+    observability = {
+    enabled               = true
+    enable_default_alarms = true
+    default_alarm_actions             = [module.cw_sns.topic_arn]
+  }
+
 }
 
 
@@ -198,5 +206,11 @@ module "cloudfront_admin" {
       }
       origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
     }
+  }
+
+    observability = {
+    enabled               = true
+    enable_default_alarms = true
+    default_alarm_actions             = [module.cw_sns.topic_arn]
   }
 }

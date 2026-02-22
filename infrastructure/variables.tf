@@ -15,3 +15,21 @@ variable "name_prefix" {
     type        = string
     default     = "sblg-"
 }
+
+variable "codestar_connection_arn" {
+    description = "ARN of the CodeStar Connections connection to use for CodePipeline source stage. Must be in the format arn:aws:codestar-connections:region:account-id:connection/connection-id"
+    type        = string
+    default = ""  
+}
+
+variable "repo_fullId" {
+    description = "The full repository ID for the CodeStar Connections source, in the format owner/repo. E.g. shaunniee/serverless"
+    type        = string  
+    default = ""
+}
+
+variable "repo_branch" {
+    description = "The branch to use for the CodeStar Connections source."
+    type        = string  
+    default = ""  
+}

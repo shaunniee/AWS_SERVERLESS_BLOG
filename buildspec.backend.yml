@@ -24,19 +24,27 @@ phases:
 
   pre_build:
     commands:
+      # ── Ensure enough git history for diff ──
+      - |
+        if git rev-parse HEAD~1 >/dev/null 2>&1; then
+          echo "Git history available"
+        else
+          echo "Shallow clone detected — fetching more history"
+          git fetch --deepen=2 2>/dev/null || true
+        fi
       # ── Detect which folders changed ──
       - echo "── Change Detection ──"
       - |
         # Get changed files between current and previous commit
-        CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "backend/")
+        CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "FULL_DEPLOY")
         echo "Changed files:"
         echo "$CHANGED_FILES"
 
         # Check if the shared layer changed
         LAYER_CHANGED="false"
-        if echo "$CHANGED_FILES" | grep -q "^backend/blog_lambda_layer/"; then
+        if [ "$CHANGED_FILES" = "FULL_DEPLOY" ] || echo "$CHANGED_FILES" | grep -q "^backend/blog_lambda_layer/"; then
           LAYER_CHANGED="true"
-          echo "Layer changed — all lambdas will be redeployed"
+          echo "Layer changed or first run — all lambdas will be redeployed"
         fi
 
         # Determine which lambda folders changed
@@ -45,7 +53,7 @@ phases:
           FUNC_NAME=$(echo "$ENTRY" | cut -d: -f1)
           FOLDER=$(echo "$ENTRY" | cut -d: -f2)
 
-          if [ "$LAYER_CHANGED" = "true" ] || echo "$CHANGED_FILES" | grep -q "^backend/${FOLDER}/"; then
+          if [ "$CHANGED_FILES" = "FULL_DEPLOY" ] || [ "$LAYER_CHANGED" = "true" ] || echo "$CHANGED_FILES" | grep -q "^backend/${FOLDER}/"; then
             CHANGED_LAMBDAS="$CHANGED_LAMBDAS $ENTRY"
             echo "→ Will deploy: $FUNC_NAME (folder: $FOLDER)"
           fi
@@ -69,6 +77,7 @@ phases:
         if [ "$SKIP_BUILD" = "true" ]; then
           echo "Nothing to deploy — exiting cleanly"
           mkdir -p /tmp/deploy_artifacts
+          echo '{"status":"skipped","reason":"no backend changes detected"}' > /tmp/deploy_artifacts/build_result.json
           exit 0
         fi
       # ── Build layer if changed ──

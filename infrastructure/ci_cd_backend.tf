@@ -261,9 +261,10 @@ module "backend_ci_cd" {
             owner    = "AWS"
             provider = "CodeStarSourceConnection"
             configuration = {
-              ConnectionArn    = var.codestar_connection_arn
-              FullRepositoryId = var.repo_fullId
-              BranchName       = var.repo_branch
+              ConnectionArn        = var.codestar_connection_arn
+              FullRepositoryId     = var.repo_fullId
+              BranchName           = var.repo_branch
+              OutputArtifactFormat = "CODEBUILD_CLONE_REF"
             }
             output_artifacts = ["source_output"]
             observability = {
@@ -304,4 +305,20 @@ module "backend_ci_cd" {
 resource "aws_iam_role_policy_attachment" "codebuild_lambda_deploy" {
   role       = module.backend_ci_cd.codebuild_role_names["backend_build"]
   policy_arn = aws_iam_policy.codebuild_lambda_deploy.arn
+}
+
+# CodeBuild needs codestar-connections:UseConnection for CODEBUILD_CLONE_REF
+resource "aws_iam_role_policy" "codebuild_codestar_connection" {
+  name = "${var.name_prefix}codebuild-backend-codestar"
+  role = module.backend_ci_cd.codebuild_role_names["backend_build"]
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "codestar-connections:UseConnection"
+        Resource = var.codestar_connection_arn
+      }
+    ]
+  })
 }

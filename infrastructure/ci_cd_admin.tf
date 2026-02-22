@@ -151,7 +151,24 @@ module "admin_ci_cd" {
     }
   }
 
-codepipeline ={
+codepipeline = {
+  pipeline_type  = "V2"
+  execution_mode = "QUEUED"
+
+  triggers = [
+    {
+      git_configuration = {
+        source_action_name = "Source"
+        push = [
+          {
+            branches   = { includes = [var.repo_branch], excludes = ["noop"] }
+            file_paths = { includes = ["admin-frontend/**", "buildspec.admin-frontend.yml"], excludes = ["noop"] }
+          }
+        ]
+      }
+    }
+  ]
+
   stages = [
     {
       name = "Source"

@@ -91,6 +91,8 @@ resource "aws_iam_policy" "codebuild_cf_invalidation_public" {
 module "public_ci_cd" {
   source = "git::https://github.com/shaunniee/terraform_modules.git//aws_ci_cd?ref=main"
 
+  
+
   name                   = "${var.name_prefix}-cicd-public"
   create_artifact_bucket = true
   create_kms_key         = true
@@ -138,7 +140,24 @@ module "public_ci_cd" {
     }
   }
 
-codepipeline ={
+codepipeline = {
+  pipeline_type  = "V2"
+  execution_mode = "QUEUED"
+
+  triggers = [
+    {
+      git_configuration = {
+        source_action_name = "Source"
+        push = [
+          {
+            branches   = { includes = [var.repo_branch], excludes = ["noop"] }
+            file_paths = { includes = ["public-frontend/**", "buildspec.public-frontend.yml"], excludes = ["noop"] }
+          }
+        ]
+      }
+    }
+  ]
+
   stages = [
     {
       name = "Source"

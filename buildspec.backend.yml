@@ -1,0 +1,221 @@
+version: 0.2
+
+# ─────────────────────────────────────────────────────────────
+# Backend Lambda CI/CD – Canary Deployment Buildspec
+# ─────────────────────────────────────────────────────────────
+# 1. Detects which lambda folders changed (git diff)
+# 2. Builds the shared layer if layer changed
+# 3. Packages only the changed lambdas
+# 4. Publishes new versions + writes CodeDeploy appspec files
+# 5. Triggers CodeDeploy canary deployments per changed lambda
+# ─────────────────────────────────────────────────────────────
+
+env:
+  variables:
+    LAYER_NAME: "lambda_layer"
+    CODEDEPLOY_APP: ""
+    # Mapping: function_name:folder_name:zip_name
+    LAMBDA_MAP: "admin_blog_posts:admin_blog_post:blog_posts presign_lambda:presign_lambda:presign_lambda public_posts_lambda:public_posts_lambda:public_posts_lambda leads_lambda:leads_lambda:leads_lambda notifications_lambda:notifications_lambda:notifications_lambda cleanup_lambda:cleanup_lambda:cleanup_lambda"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+
+  pre_build:
+    commands:
+      # ── Detect which folders changed ──
+      - echo "── Change Detection ──"
+      - |
+        # Get changed files between current and previous commit
+        CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "backend/")
+        echo "Changed files:"
+        echo "$CHANGED_FILES"
+
+        # Check if the shared layer changed
+        LAYER_CHANGED="false"
+        if echo "$CHANGED_FILES" | grep -q "^backend/blog_lambda_layer/"; then
+          LAYER_CHANGED="true"
+          echo "Layer changed — all lambdas will be redeployed"
+        fi
+
+        # Determine which lambda folders changed
+        CHANGED_LAMBDAS=""
+        for ENTRY in $LAMBDA_MAP; do
+          FUNC_NAME=$(echo "$ENTRY" | cut -d: -f1)
+          FOLDER=$(echo "$ENTRY" | cut -d: -f2)
+
+          if [ "$LAYER_CHANGED" = "true" ] || echo "$CHANGED_FILES" | grep -q "^backend/${FOLDER}/"; then
+            CHANGED_LAMBDAS="$CHANGED_LAMBDAS $ENTRY"
+            echo "→ Will deploy: $FUNC_NAME (folder: $FOLDER)"
+          fi
+        done
+
+        if [ -z "$CHANGED_LAMBDAS" ]; then
+          echo "No lambda changes detected — skipping deployment"
+          echo "SKIP_BUILD=true" > /tmp/build_env.sh
+        else
+          echo "SKIP_BUILD=false" > /tmp/build_env.sh
+          echo "LAYER_CHANGED=$LAYER_CHANGED" >> /tmp/build_env.sh
+          echo "CHANGED_LAMBDAS=\"$CHANGED_LAMBDAS\"" >> /tmp/build_env.sh
+        fi
+      - cat /tmp/build_env.sh
+      - . /tmp/build_env.sh
+
+  build:
+    commands:
+      - . /tmp/build_env.sh
+      - |
+        if [ "$SKIP_BUILD" = "true" ]; then
+          echo "Nothing to deploy — exiting cleanly"
+          mkdir -p /tmp/deploy_artifacts
+          exit 0
+        fi
+      # ── Build layer if changed ──
+      - |
+        if [ "$LAYER_CHANGED" = "true" ]; then
+          echo "── Building Lambda Layer ──"
+          cd "$CODEBUILD_SRC_DIR/backend/blog_lambda_layer"
+          rm -rf nodejs/node_modules
+          cd nodejs && npm ci --omit=dev && cd ..
+          zip -rq layer.zip nodejs/
+
+          LAYER_VERSION_ARN=$(aws lambda publish-layer-version \
+            --layer-name "$LAYER_NAME" \
+            --compatible-runtimes nodejs18.x \
+            --zip-file "fileb://layer.zip" \
+            --query 'LayerVersionArn' \
+            --output text)
+          echo "Published layer: $LAYER_VERSION_ARN"
+        else
+          echo "── Layer unchanged — fetching current layer ARN ──"
+          LAYER_VERSION_ARN=$(aws lambda get-function --function-name "admin_blog_posts" \
+            --query 'Configuration.Layers[0].Arn' --output text)
+          echo "Current layer: $LAYER_VERSION_ARN"
+        fi
+        echo "LAYER_VERSION_ARN=$LAYER_VERSION_ARN" >> /tmp/build_env.sh
+
+      # ── Package, deploy, and trigger canary for each changed lambda ──
+      - . /tmp/build_env.sh
+      - mkdir -p /tmp/deploy_artifacts
+      - |
+        for ENTRY in $CHANGED_LAMBDAS; do
+          FUNC_NAME=$(echo "$ENTRY" | cut -d: -f1)
+          FOLDER=$(echo "$ENTRY" | cut -d: -f2)
+          ZIP_NAME=$(echo "$ENTRY" | cut -d: -f3)
+
+          echo ""
+          echo "══════════════════════════════════════════"
+          echo "  Deploying: $FUNC_NAME"
+          echo "══════════════════════════════════════════"
+
+          # Package
+          cd "$CODEBUILD_SRC_DIR/backend/$FOLDER"
+          zip -rq "/tmp/${FUNC_NAME}.zip" index.js
+          echo "  ✓ Packaged"
+
+          # Get current live alias version (before update)
+          CURRENT_VERSION=$(aws lambda get-alias \
+            --function-name "$FUNC_NAME" \
+            --name "live" \
+            --query 'FunctionVersion' \
+            --output text)
+          echo "  Current live version: $CURRENT_VERSION"
+
+          # Update function code
+          aws lambda update-function-code \
+            --function-name "$FUNC_NAME" \
+            --zip-file "fileb:///tmp/${FUNC_NAME}.zip" \
+            --no-cli-pager > /dev/null
+          aws lambda wait function-updated --function-name "$FUNC_NAME"
+          echo "  ✓ Code updated"
+
+          # Update layer if it changed
+          if [ "$LAYER_CHANGED" = "true" ]; then
+            aws lambda update-function-configuration \
+              --function-name "$FUNC_NAME" \
+              --layers "$LAYER_VERSION_ARN" \
+              --no-cli-pager > /dev/null
+            aws lambda wait function-updated --function-name "$FUNC_NAME"
+            echo "  ✓ Layer updated"
+          fi
+
+          # Publish new version
+          NEW_VERSION=$(aws lambda publish-version \
+            --function-name "$FUNC_NAME" \
+            --query 'Version' \
+            --output text)
+          echo "  ✓ Published version: $NEW_VERSION"
+
+          # Write AppSpec for CodeDeploy canary deployment
+          FUNC_ARN=$(aws lambda get-function \
+            --function-name "$FUNC_NAME" \
+            --query 'Configuration.FunctionArn' \
+            --output text)
+
+          cat > "/tmp/deploy_artifacts/appspec_${FUNC_NAME}.yml" <<EOF
+        version: 0.0
+        Resources:
+          - ${FUNC_NAME}:
+              Type: AWS::Lambda::Function
+              Properties:
+                Name: "${FUNC_NAME}"
+                Alias: "live"
+                CurrentVersion: "${CURRENT_VERSION}"
+                TargetVersion: "${NEW_VERSION}"
+        EOF
+
+          echo "  ✓ AppSpec written"
+
+          # Trigger CodeDeploy deployment
+          DEPLOYMENT_GROUP="${FUNC_NAME}-canary"
+          APPSPEC_CONTENT=$(cat "/tmp/deploy_artifacts/appspec_${FUNC_NAME}.yml")
+
+          DEPLOYMENT_ID=$(aws deploy create-deployment \
+            --application-name "$CODEDEPLOY_APP" \
+            --deployment-group-name "$DEPLOYMENT_GROUP" \
+            --revision "revisionType=AppSpecContent,appSpecContent={content='$(echo "$APPSPEC_CONTENT" | sed "s/'/\\\\'/g")'}" \
+            --query 'deploymentId' \
+            --output text 2>&1) || true
+
+          if [ -n "$DEPLOYMENT_ID" ] && [ "$DEPLOYMENT_ID" != "None" ]; then
+            echo "  ✓ CodeDeploy triggered: $DEPLOYMENT_ID"
+            echo "$FUNC_NAME=$DEPLOYMENT_ID" >> /tmp/deploy_artifacts/deployments.txt
+          else
+            echo "  ⚠ CodeDeploy trigger failed — falling back to direct alias update"
+            aws lambda update-alias \
+              --function-name "$FUNC_NAME" \
+              --name "live" \
+              --function-version "$NEW_VERSION" \
+              --no-cli-pager > /dev/null
+            echo "  ✓ Alias updated directly to v$NEW_VERSION"
+          fi
+        done
+
+  post_build:
+    commands:
+      - . /tmp/build_env.sh
+      - |
+        if [ "$SKIP_BUILD" = "true" ]; then
+          echo "── No changes — build skipped ──"
+          exit 0
+        fi
+      - echo ""
+      - echo "── Deployment Summary ──"
+      - |
+        if [ -f /tmp/deploy_artifacts/deployments.txt ]; then
+          echo "CodeDeploy canary deployments in progress:"
+          cat /tmp/deploy_artifacts/deployments.txt
+          echo ""
+          echo "Monitor in the AWS CodeDeploy console."
+          echo "Traffic will shift: 10% → wait 5 min → 100%"
+          echo "Auto-rollback on CloudWatch alarm trigger."
+        else
+          echo "All deployments completed via direct alias updates."
+        fi
+
+artifacts:
+  base-directory: /tmp/deploy_artifacts
+  files:
+    - "**/*"
+  discard-paths: false

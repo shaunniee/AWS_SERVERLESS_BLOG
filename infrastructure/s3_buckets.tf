@@ -49,7 +49,7 @@ module "media_bucket" {
     cors_rules = [
         {
             allowed_headers = ["*"]
-            allowed_methods = ["GET", "POST"]
+            allowed_methods = ["GET", "POST", "PUT", "DELETE"]
             allowed_origins = ["*"]
             expose_headers = []
             max_age_seconds = 3000

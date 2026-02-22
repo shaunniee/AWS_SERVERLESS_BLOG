@@ -25,6 +25,10 @@ JS
 module "cloudfront_public" {
   source            = "git::https://github.com/shaunniee/terraform_modules.git//aws_cloudfront?ref=main"
   distribution_name = "${var.name_prefix}-public-distribution"
+    default_root_object = "index.html"
+    spa_fallback        = true
+
+  spa_fallback_status_codes = [403, 404]
 
   origins = {
     web = {
@@ -145,6 +149,10 @@ JS
 module "cloudfront_admin" {
   source            = "git::https://github.com/shaunniee/terraform_modules.git//aws_cloudfront?ref=main"
   distribution_name = "${var.name_prefix}-admin-distribution"
+  default_root_object = "index.html"
+    spa_fallback        = true
+
+  spa_fallback_status_codes = [403, 404]
 
   origins = {
     web = {
@@ -183,7 +191,7 @@ module "cloudfront_admin" {
       path_pattern           = "/media/*"
       target_origin_id       = "media-origin"
       viewer_protocol_policy = "redirect-to-https"
-      allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+      allowed_methods        = ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"]
       cached_methods         = ["GET", "HEAD"]
       cache_disabled         = false
       requires_signed_url    = false
@@ -213,4 +221,21 @@ module "cloudfront_admin" {
     enable_default_alarms = true
     default_alarm_actions             = [module.cw_sns.topic_arn]
   }
+}
+# s3 bucket policy to allow admin cf read from admin frontend bucket
+
+module "admin_frontend_bucket_policy" {
+  source = "./iam/policies/cloudfront-admin-bucket-policy"
+  bucket_arn = module.admin_frontend_bucket.bucket_arn
+  bucket_id = module.admin_frontend_bucket.bucket_id
+  source_arn = module.cloudfront_admin.cloudfront_distribution_arn
+}
+
+# S3 bucket policy to allow admin CloudFront to read from the media bucket
+
+module "admin_media_bucket_policy" {
+  source = "./iam/policies/cloudfront-media-bucket-policy"
+  bucket_arn = module.media_bucket.bucket_arn
+  bucket_id = module.media_bucket.bucket_id
+  source_arn = module.cloudfront_admin.cloudfront_distribution_arn
 }

@@ -158,9 +158,9 @@ module "admin_api" {
       authorization  = "COGNITO_USER_POOLS"
       authorizer_key = "cognito_user_pool"
     }
-    # GET /admin/media/upload_url
+    # POST /admin/media/upload_url
     get_upload_url = {
-      http_method    = "GET"
+      http_method    = "POST"
       resource_key   = "upload_url"
       authorization  = "COGNITO_USER_POOLS"
       authorizer_key = "cognito_user_pool"
@@ -476,7 +476,7 @@ module "admin_api" {
       method_response_key = "upload_url_options_200"
       response_parameters = {
         "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-        "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+        "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS,POST,PUT,DELETE'"
         "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
       }
     }
@@ -485,7 +485,7 @@ module "admin_api" {
       method_response_key = "leads_options_200"
       response_parameters = {
         "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-        "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,DELETE,OPTIONS'"
+        "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,DELETE,OPTIONS,POST'"
         "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
       }
     }

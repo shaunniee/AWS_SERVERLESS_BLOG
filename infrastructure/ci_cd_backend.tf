@@ -125,12 +125,24 @@ module "backend_ci_cd" {
           }
         ]
       }
+      observability = {
+        enabled               = true
+        enable_default_alarms = true
+        enable_dashboard      = false
+        default_alarm_actions = [module.cw_sns.topic_arn]
+      }
     }
   }
 
   # ── CodeDeploy – Lambda Canary ─────────────────
   codedeploy = {
     compute_platform = "Lambda"
+
+    observability = {
+      enabled               = true
+      enable_default_alarms = true
+      default_alarm_actions = [module.cw_sns.topic_arn]
+    }
 
     custom_deployment_configs = {
       "Canary10Percent5Minutes" = {
@@ -231,6 +243,13 @@ module "backend_ci_cd" {
     pipeline_type  = "V2"
     execution_mode = "QUEUED"
 
+    observability = {
+      enabled               = true
+      enable_default_alarms = true
+      enable_dashboard      = false
+      default_alarm_actions = [module.cw_sns.topic_arn]
+    }
+
     triggers = [
       {
         git_configuration = {
@@ -267,11 +286,6 @@ module "backend_ci_cd" {
               OutputArtifactFormat = "CODEBUILD_CLONE_REF"
             }
             output_artifacts = ["source_output"]
-            observability = {
-              enabled               = true
-              enable_default_alarms = true
-              default_alarm_actions = [module.cw_sns.topic_arn]
-            }
           }
         ]
       },
@@ -286,11 +300,6 @@ module "backend_ci_cd" {
             configuration    = { ProjectName = "${var.name_prefix}-cicd-backend-backend_build" }
             input_artifacts  = ["source_output"]
             output_artifacts = ["build_output"]
-            observability = {
-              enabled               = true
-              enable_default_alarms = true
-              default_alarm_actions = [module.cw_sns.topic_arn]
-            }
           }
         ]
       }

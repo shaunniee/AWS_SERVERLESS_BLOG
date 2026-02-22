@@ -148,12 +148,25 @@ module "admin_ci_cd" {
           }
         ]
       }
+      observability = {
+        enabled               = true
+        enable_default_alarms = true
+        enable_dashboard      = false
+        default_alarm_actions = [module.cw_sns.topic_arn]
+      }
     }
   }
 
 codepipeline = {
   pipeline_type  = "V2"
   execution_mode = "QUEUED"
+
+  observability = {
+    enabled               = true
+    enable_default_alarms = true
+    enable_dashboard      = false
+    default_alarm_actions = [module.cw_sns.topic_arn]
+  }
 
   triggers = [
     {
@@ -184,11 +197,6 @@ codepipeline = {
              BranchName       = var.repo_branch
           }
           output_artifacts = ["source_output"]
-          observability = {
-            enabled               = true
-            enable_default_alarms = true
-            default_alarm_actions = [module.cw_sns.topic_arn]
-        }
         }
       ]
     },
@@ -203,11 +211,6 @@ codepipeline = {
           configuration    = { ProjectName = "${var.name_prefix}-cicd-admin-frontend_build" }
           input_artifacts  = ["source_output"]
           output_artifacts = ["build_output"]
-                    observability = {
-            enabled               = true
-            enable_default_alarms = true
-            default_alarm_actions = [module.cw_sns.topic_arn]
-        }
         }
       ]
   }]

@@ -96,7 +96,8 @@ module "cloudfront_public" {
     observability = {
     enabled               = true
     enable_default_alarms = true
-    default_alarm_actions             = [module.cw_sns.topic_arn]
+    enable_dashboard      = false
+    default_alarm_actions = [module.cw_sns.topic_arn]
   }
 
 }
@@ -219,7 +220,8 @@ module "cloudfront_admin" {
     observability = {
     enabled               = true
     enable_default_alarms = true
-    default_alarm_actions             = [module.cw_sns.topic_arn]
+    enable_dashboard      = false
+    default_alarm_actions = [module.cw_sns.topic_arn]
   }
 }
 # s3 bucket policy to allow admin cf read from admin frontend bucket

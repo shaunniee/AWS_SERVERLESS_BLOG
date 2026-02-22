@@ -189,7 +189,7 @@ codepipeline ={
           category         = "Build"
           owner            = "AWS"
           provider         = "CodeBuild"
-          configuration    = { ProjectName = "frontend-web-frontend_build" }
+          configuration    = { ProjectName = "${var.name_prefix}-cicd-admin-frontend_build" }
           input_artifacts  = ["source_output"]
           output_artifacts = ["build_output"]
                     observability = {

@@ -27,6 +27,9 @@ A production-grade serverless blog platform on AWS with a public-facing blog and
 - [What This Project Demonstrates](#-what-this-project-demonstrates)
 - [Architecture Overview](#-architecture-overview)
 - [Architecture Diagram](#-architecture-diagram)
+- [Architectural Patterns Used](#-architectural-patterns-used)
+- [Service Dependency Map](#-service-dependency-map)
+- [Request Lifecycle](#-request-lifecycle)
 - [Project Structure](#-project-structure)
 - [AWS Services Used](#-aws-services-used)
 - [Infrastructure as Code (Terraform)](#-infrastructure-as-code-terraform)
@@ -40,12 +43,15 @@ A production-grade serverless blog platform on AWS with a public-facing blog and
 - [Email Notifications — SES](#-email-notifications--ses)
 - [Media Handling — Presigned URLs](#-media-handling--presigned-urls)
 - [CI/CD Pipelines — CodePipeline + CodeBuild + CodeDeploy](#-cicd-pipelines--codepipeline--codebuild--codedeploy)
+- [Deployment Strategy Visualized](#-deployment-strategy-visualized)
 - [Observability & Monitoring](#-observability--monitoring)
 - [Security Deep Dive](#-security-deep-dive)
+- [Data Flow Diagrams](#-data-flow-diagrams)
 - [Frontend Applications](#-frontend-applications)
 - [Configuration Management — SSM Parameter Store](#-configuration-management--ssm-parameter-store)
 - [Event-Driven Flows (End-to-End)](#-event-driven-flows-end-to-end)
 - [Failure Handling & Resilience](#-failure-handling--resilience)
+- [Cost Architecture](#-cost-architecture)
 - [Best Practices Applied](#-best-practices-applied)
 - [Potential Improvements](#-potential-improvements)
 - [Author](#-author)
@@ -155,6 +161,692 @@ EventBridge (Custom Event Bus)
 ## Architecture Diagram
 
 ![Architecture Diagram](infrastructure/Architecture_v3.drawio.png)
+
+---
+
+## Architectural Patterns Used
+
+This project implements **12 well-known cloud architecture patterns**. Each pattern solves a specific problem and maps directly to AWS services used in this platform.
+
+### Pattern Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    ARCHITECTURAL PATTERNS MAP                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────────┐   │
+│  │  STRUCTURAL  │  │  BEHAVIORAL  │  │  DEPLOYMENT & DELIVERY  │   │
+│  ├─────────────┤  ├──────────────┤  ├─────────────────────────┤   │
+│  │ Microservice │  │ Event-Driven │  │ Canary Deployment       │   │
+│  │ BFF          │  │ Pub/Sub      │  │ Blue/Green              │   │
+│  │ API Gateway  │  │ CQRS (Lite)  │  │ Immutable Infra         │   │
+│  │ Static Host  │  │ Async Msg    │  │ GitOps                  │   │
+│  └─────────────┘  └──────────────┘  └─────────────────────────┘   │
+│                                                                     │
+│  ┌──────────────────┐  ┌──────────────────────────────────────┐   │
+│  │  RESILIENCE       │  │  SECURITY                            │   │
+│  ├──────────────────┤  ├──────────────────────────────────────┤   │
+│  │ Dead Letter Queue │  │ Defense in Depth                     │   │
+│  │ Retry w/ Backoff  │  │ Zero Trust (per-function IAM)        │   │
+│  │ Bulkhead Isolation│  │ Least Privilege                      │   │
+│  └──────────────────┘  └──────────────────────────────────────┘   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 1. Microservices / Single-Responsibility Functions
+
+Each Lambda function owns exactly one domain capability. No "god functions."
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                     FUNCTION DECOMPOSITION                        │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  ┌──────────────────┐    ┌──────────────────┐                    │
+│  │  admin_blog_posts │    │  public_posts     │                    │
+│  │  ────────────────│    │  ────────────────│                    │
+│  │  Posts CRUD       │    │  Read-only posts  │                    │
+│  │  DynamoDB R/W     │    │  DynamoDB Query   │                    │
+│  │  EventBridge emit │    │  (GSI only)       │                    │
+│  └──────────────────┘    └──────────────────┘                    │
+│                                                                    │
+│  ┌──────────────────┐    ┌──────────────────┐                    │
+│  │  leads_lambda     │    │  presign_lambda   │                    │
+│  │  ────────────────│    │  ────────────────│                    │
+│  │  Lead management  │    │  Presigned URLs   │                    │
+│  │  DynamoDB R/W     │    │  S3 PutObject     │                    │
+│  │  EventBridge emit │    │  Content-type     │                    │
+│  └──────────────────┘    │  validation       │                    │
+│                           └──────────────────┘                    │
+│  ┌──────────────────┐    ┌──────────────────┐                    │
+│  │  notifications    │    │  cleanup          │                    │
+│  │  ────────────────│    │  ────────────────│                    │
+│  │  Email via SES    │    │  S3 media delete  │                    │
+│  │  EventBridge sub  │    │  EventBridge sub  │                    │
+│  │  Async only       │    │  Async only       │                    │
+│  └──────────────────┘    └──────────────────┘                    │
+│                                                                    │
+│  Each function has: Own IAM role │ Own log group │ Own alarm set  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Why this matters:** If the notification service fails, blog reads and writes continue unaffected. If the presign Lambda has a bug, it doesn't impact lead submissions. Blast radius is contained per function.
+
+---
+
+### 2. Backend for Frontend (BFF) Pattern
+
+Two separate API Gateways serve two different frontend applications with different trust levels and capabilities.
+
+```
+┌──────────────────┐          ┌───────────────────────────────────┐
+│  Public Frontend  │────────►│  Public API Gateway               │
+│  (React SPA)      │          │  ─────────────────               │
+│                    │          │  • No authentication              │
+│  Read-only blog    │          │  • GET /posts, POST /leads only  │
+│  Lead submission   │          │  • Read-only DynamoDB access      │
+└──────────────────┘          └───────────────────────────────────┘
+
+┌──────────────────┐          ┌───────────────────────────────────┐
+│  Admin Frontend   │────────►│  Admin API Gateway                │
+│  (React CMS)      │          │  ─────────────────               │
+│                    │          │  • Cognito JWT required           │
+│  Full CMS editor   │          │  • Full CRUD + lifecycle ops     │
+│  Media upload      │          │  • Presigned URL generation      │
+│  Lead management   │          │  • Full DynamoDB access          │
+└──────────────────┘          └───────────────────────────────────┘
+```
+
+**Why BFF:** A single API serving both frontends would require complex authorization logic inside each Lambda. The BFF pattern pushes this responsibility to the infrastructure layer (API Gateway + Cognito authorizer), keeping Lambda code simple.
+
+---
+
+### 3. API Gateway Pattern (Edge Gateway)
+
+CloudFront acts as the outermost edge gateway, routing to different origins based on URL paths.
+
+```
+                            ┌─────────────────────────┐
+                            │      CLOUDFRONT          │
+                            │     (Edge Gateway)       │
+                            └────────┬────────────────┘
+                                     │
+                    ┌────────────────┼────────────────┐
+                    │                │                  │
+                    ▼                ▼                  ▼
+            ┌──────────┐    ┌──────────┐      ┌──────────┐
+            │  /* path  │    │ /api/*   │      │ /media/* │
+            │           │    │          │      │          │
+            │   S3      │    │  API GW  │      │   S3     │
+            │ Frontend  │    │ Backend  │      │  Media   │
+            │           │    │          │      │          │
+            │ React SPA │    │ Lambda   │      │ Images/  │
+            │ (cached)  │    │ (no      │      │ Videos   │
+            │           │    │  cache)  │      │ (CDN)    │
+            └──────────┘    └──────────┘      └──────────┘
+```
+
+**Composition of concerns at the edge:**
+- **Static assets** → S3 origin with caching
+- **API calls** → API Gateway origin, CloudFront function rewrites the path
+- **Media** → S3 origin via CDN
+- **TLS termination** → single certificate at CloudFront
+- **No CORS** → everything served from the same domain
+
+---
+
+### 4. Event-Driven Architecture / Pub-Sub Pattern
+
+Synchronous API handlers publish events. Async consumers subscribe independently.
+
+```
+                    PUBLISHERS                      SUBSCRIBERS
+               ┌─────────────────┐            ┌─────────────────┐
+               │                 │            │                 │
+┌──────────┐   │   EventBridge   │   ┌────────┤ Notifications   │──► SES
+│ Leads    │───┤►  Custom Bus    │───┤        │ Lambda          │    Email
+│ Lambda   │   │                 │   │        └─────────────────┘
+└──────────┘   │  ┌───────────┐  │   │
+               │  │ Event     │  │   │        ┌─────────────────┐
+┌──────────┐   │  │ Rules     │  │   └────────┤ Cleanup         │──► S3
+│ Admin    │───┤►│ (pattern  │  │            │ Lambda          │    Delete
+│ Lambda   │   │  │  match)   │  │            └─────────────────┘
+└──────────┘   │  └───────────┘  │
+               │                 │            ┌─────────────────┐
+               │  ┌───────────┐  │            │ [Future]        │
+               │  │ Dead      │◄─┤── Fails ──┤ Analytics       │
+               │  │ Letter Q  │  │            │ Slack Webhook   │
+               │  └───────────┘  │            └─────────────────┘
+               └─────────────────┘
+```
+
+**Key insight:** Adding a new subscriber (e.g., Slack notification on lead creation) requires only a new EventBridge rule and a new Lambda. Zero changes to existing producers.
+
+---
+
+### 5. CQRS (Command Query Responsibility Segregation) — Lite
+
+The read and write paths are physically separated through different API Gateways, different Lambdas, and different DynamoDB access patterns.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        CQRS (Lite)                               │
+├──────────────────────────────┬──────────────────────────────────┤
+│         COMMAND SIDE          │          QUERY SIDE              │
+│      (Admin API Gateway)      │     (Public API Gateway)         │
+├──────────────────────────────┤──────────────────────────────────┤
+│                                │                                  │
+│  POST /admin/posts            │  GET /posts                      │
+│  PUT  /admin/posts/{id}       │  GET /posts/{postId}             │
+│  DELETE /admin/posts/{id}     │                                  │
+│  POST /admin/posts/{id}/...   │                                  │
+│                                │                                  │
+│  ┌──────────────────────┐     │  ┌──────────────────────┐       │
+│  │  admin_blog_posts     │     │  │  public_posts_lambda  │       │
+│  │  ──────────────────  │     │  │  ──────────────────  │       │
+│  │  PutItem              │     │  │  Query (GSI only)    │       │
+│  │  UpdateItem           │     │  │  GetItem             │       │
+│  │  DeleteItem           │     │  │                      │       │
+│  │  Query + Scan         │     │  │  No writes allowed   │       │
+│  └──────────────────────┘     │  └──────────────────────┘       │
+│                                │                                  │
+│  IAM: Full DynamoDB CRUD       │  IAM: Query permission only      │
+│  Auth: Cognito JWT required    │  Auth: None (public access)      │
+│                                │                                  │
+│         ▼         ▼            │            ▼                     │
+│  ┌────────────────────────────┴────────────────────────────┐    │
+│  │                    DynamoDB Posts Table                    │    │
+│  │                                                           │    │
+│  │  PK: postID                                              │    │
+│  │  GSI: publishedAtIndex (status → publishedAt)            │    │
+│  │  GSI: authorIDIndex (authorID → createdAt)               │    │
+│  └───────────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Why "lite"?** True CQRS uses separate data stores. Here the same DynamoDB table is shared, but access is segregated through IAM policies — the public Lambda literally cannot write to the table. The GSIs serve as an optimized read model.
+
+---
+
+### 6. Static Content Hosting Pattern
+
+Frontend applications are pre-built SPAs deployed as static files, not server-rendered.
+
+```
+Build Time (CI/CD)                        Runtime (User Request)
+─────────────────                         ─────────────────────
+
+┌──────────┐    ┌──────────┐              ┌──────────┐    ┌─────────┐
+│ GitHub   │───►│ CodeBuild│              │  Browser  │───►│CloudFront│
+│ (source) │    │          │              │           │    │  (CDN)   │
+└──────────┘    │ npm build│              └──────────┘    └────┬─────┘
+                │ (Vite)   │                                   │
+                └────┬─────┘                              ┌────▼─────┐
+                     │                                    │   S3     │
+                     ▼                                    │  Bucket  │
+                ┌──────────┐                              │ (static) │
+                │ S3 Sync  │──────────────────────────────►          │
+                │ + CF     │                              └──────────┘
+                │ Invalidate│
+                └──────────┘
+
+Benefits:
+• Zero server management         • Global edge caching
+• Instant horizontal scaling      • Low cost (S3 + CloudFront)
+• SPA client-side routing         • Independent frontend deploys
+```
+
+---
+
+### 7. Strangler Fig / Presigned URL Pattern
+
+Instead of routing file uploads through Lambda (limited to 6MB payload), the presigned URL pattern offloads uploads directly to S3.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│            PRESIGNED URL PATTERN (Valet Key)                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  Step 1: Request permission                                  │
+│  ┌────────┐  POST /media/upload_url  ┌──────────────┐       │
+│  │ Browser │─────────────────────────►│ Presign      │       │
+│  │         │                          │ Lambda       │       │
+│  │         │◄─────────────────────────│              │       │
+│  └────┬───┘  { presigned_url }       │ • Validates  │       │
+│       │                               │   type       │       │
+│       │                               │ • Generates  │       │
+│       │                               │   URL (5min) │       │
+│       │                               └──────────────┘       │
+│       │                                                       │
+│  Step 2: Upload directly to S3 (Lambda NOT involved)         │
+│       │                                                       │
+│       │      PUT (presigned URL)     ┌──────────────┐        │
+│       └─────────────────────────────►│     S3       │        │
+│                                       │  Media       │        │
+│              No API Gateway           │  Bucket      │        │
+│              No Lambda                │              │        │
+│              No 6MB limit             └──────────────┘        │
+│              Direct to S3                                     │
+│                                                               │
+│  Step 3: Serve via CDN                                       │
+│  ┌────────┐  GET /media/image.jpg   ┌──────────────┐        │
+│  │ Browser │◄────────────────────────│  CloudFront  │        │
+│  └────────┘                          │  (CDN)       │        │
+│                                       └──────────────┘        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+This is also known as the **Valet Key Pattern** — the server grants a limited, time-bound credential for a specific operation instead of proxying the entire data transfer.
+
+---
+
+### 8. Bulkhead Isolation Pattern
+
+Resources are partitioned so that failure in one area doesn't cascade to others.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    BULKHEAD ISOLATION                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌────────────────┐  │
+│  │  PUBLIC          │  │  ADMIN           │  │  ASYNC          │  │
+│  │  BULKHEAD        │  │  BULKHEAD        │  │  BULKHEAD       │  │
+│  │                  │  │                  │  │                 │  │
+│  │ • Own CloudFront │  │ • Own CloudFront │  │ • Own EventBus │  │
+│  │ • Own API GW     │  │ • Own API GW     │  │ • Own DLQs     │  │
+│  │ • Own Lambdas    │  │ • Own Lambdas    │  │ • Own Lambdas  │  │
+│  │ • Own IAM Roles  │  │ • Own IAM Roles  │  │ • Own IAM      │  │
+│  │ • Own Alarms     │  │ • Own Alarms     │  │ • Own Alarms   │  │
+│  │                  │  │                  │  │                 │  │
+│  │ If public site   │  │ If admin CMS     │  │ If email fails │  │
+│  │ gets traffic     │  │ has a bug, the   │  │ or cleanup     │  │
+│  │ spike, admin     │  │ public site is   │  │ errors, APIs   │  │
+│  │ CMS is           │  │ unaffected.      │  │ keep working.  │  │
+│  │ unaffected.      │  │                  │  │                 │  │
+│  └─────────────────┘  └─────────────────┘  └────────────────┘  │
+│                                                                   │
+│  ┌─────────────────────────────────────────────────────────┐     │
+│  │  SHARED RESOURCES (controlled access)                    │     │
+│  │  • DynamoDB posts table (different IAM per consumer)    │     │
+│  │  • S3 media bucket (read via CF, write via presign)     │     │
+│  │  • EventBridge bus (publish-only per Lambda)            │     │
+│  └─────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 9. Dead Letter Queue Pattern
+
+Failed async operations are captured — not silently dropped — enabling investigation and replay.
+
+```
+                    Happy Path                    Failure Path
+                    ──────────                    ────────────
+
+EventBridge ──► Lambda ──► SES ──► Email Sent     EventBridge ──► Lambda ──► FAIL
+                                   ✓ Done                                      │
+                                                                    Retry (x10)│
+                                                                               │
+                                                                    Still fails│
+                                                                               ▼
+                                                                    ┌──────────────┐
+                                                                    │  SQS Dead    │
+                                                                    │  Letter      │
+                                                                    │  Queue       │
+                                                                    └──────┬───────┘
+                                                                           │
+                                                                    ┌──────▼───────┐
+                                                                    │  CloudWatch  │
+                                                                    │  Alarm       │
+                                                                    │  (msg > 1)   │
+                                                                    └──────┬───────┘
+                                                                           │
+                                                                    ┌──────▼───────┐
+                                                                    │  SNS → Email │
+                                                                    │  to Ops Team │
+                                                                    └──────────────┘
+
+DLQ Inventory:
+┌───────────────────────┬──────────────────────────┬───────────────────┐
+│ sblg-notifications-dlq│ sblg-cleanup-dlq          │ sblg-eventbridge  │
+│                       │                           │ -dlq              │
+│ Failed email sends    │ Failed S3 media deletes   │ Failed EventBridge│
+│                       │                           │ invocations       │
+└───────────────────────┴──────────────────────────┴───────────────────┘
+```
+
+---
+
+### 10. Canary Deployment Pattern
+
+New Lambda versions receive a small percentage of traffic first. If alarms fire, traffic automatically rolls back.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              CANARY DEPLOYMENT LIFECYCLE                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  Time ──────────────────────────────────────────────────►        │
+│                                                                   │
+│  T+0: Deploy triggered                                           │
+│  ┌───────────────────────────────────────────────────────┐      │
+│  │ 90% ████████████████████████████████████░░░░░░ v1     │      │
+│  │ 10% ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░████░░ v2     │      │
+│  └───────────────────────────────────────────────────────┘      │
+│             CloudWatch monitors error rate...                    │
+│                                                                   │
+│  T+5min: If healthy ✓                                            │
+│  ┌───────────────────────────────────────────────────────┐      │
+│  │   0% ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ v1    │      │
+│  │ 100% ████████████████████████████████████████░░ v2    │      │
+│  └───────────────────────────────────────────────────────┘      │
+│             Deployment complete ✓                                │
+│                                                                   │
+│  T+5min: If alarm fires ✗                                        │
+│  ┌───────────────────────────────────────────────────────┐      │
+│  │ 100% ████████████████████████████████████████░░ v1    │      │
+│  │   0% ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ v2    │      │
+│  └───────────────────────────────────────────────────────┘      │
+│             Automatic rollback ← CodeDeploy                      │
+│                                                                   │
+│  Per-function deployment groups:                                 │
+│  admin_blog_posts │ public_posts │ leads │ presign │ notif │ cleanup│
+│  Each deploys independently — failure in one doesn't block others│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 11. Infrastructure as Code (Immutable Infrastructure) Pattern
+
+Nothing is configured manually. The entire platform is defined in Terraform and version-controlled in Git.
+
+```
+┌────────────┐    ┌────────────┐    ┌────────────────┐    ┌──────────┐
+│ Developer  │───►│   Git      │───►│  Terraform     │───►│   AWS    │
+│ writes .tf │    │  Commit    │    │  Plan + Apply  │    │ Resources│
+└────────────┘    └────────────┘    └────────────────┘    └──────────┘
+                        │
+                        ▼
+                  ┌────────────┐
+                  │  Code      │
+                  │  Review    │
+                  │  (PR)      │
+                  └────────────┘
+
+Terraform Files → AWS Resources:
+─────────────────────────────────
+lambda.tf           → 6 Lambda functions + layer + aliases
+api_gateway_*.tf    → 2 API Gateways + stages + methods
+dynamodb.tf         → 2 DynamoDB tables + GSIs
+s3.tf               → 3 S3 buckets + policies
+cloudfront.tf       → 2 CloudFront distributions
+cognito.tf          → User Pool + App Client
+eventbridge.tf      → Event bus + rules + DLQs
+iam.tf              → 16 IAM policies
+ci_cd_*.tf          → 3 CI/CD pipelines
+cloudwatch_*.tf     → Dashboard + alarms
+ssm.tf              → 8 SSM parameters
+ses.tf              → Email identity
+```
+
+---
+
+### 12. Zero Trust / Least Privilege Pattern
+
+Every function is assumed to be a potential attack vector. Permissions are scoped to the minimum required.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              PERMISSION MATRIX (Least Privilege)                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│                DynamoDB  DynamoDB  S3      S3       Event   SES  │
+│                Posts     Leads     Media   Media    Bridge       │
+│                (R/W)     (R/W)     (Read)  (Write)  (Pub)       │
+│  ┌───────────┬─────────┬────────┬───────┬────────┬───────┬────┐│
+│  │ admin_    │  ████   │        │       │        │ ████  │    ││
+│  │ blog_posts│  CRUD   │        │       │        │ Put   │    ││
+│  ├───────────┼─────────┼────────┼───────┼────────┼───────┼────┤│
+│  │ public_   │  ░░░░   │        │       │        │       │    ││
+│  │ posts     │  Query  │        │       │        │       │    ││
+│  ├───────────┼─────────┼────────┼───────┼────────┼───────┼────┤│
+│  │ leads     │         │  ████  │       │        │ ████  │    ││
+│  │           │         │  CRUD  │       │        │ Put   │    ││
+│  ├───────────┼─────────┼────────┼───────┼────────┼───────┼────┤│
+│  │ presign   │         │        │       │  ████  │       │    ││
+│  │           │         │        │       │  Put   │       │    ││
+│  ├───────────┼─────────┼────────┼───────┼────────┼───────┼────┤│
+│  │ notific.  │         │        │       │        │       │████││
+│  │           │         │        │       │        │       │Send││
+│  ├───────────┼─────────┼────────┼───────┼────────┼───────┼────┤│
+│  │ cleanup   │         │        │       │  ████  │       │    ││
+│  │           │         │        │       │  Del   │       │    ││
+│  └───────────┴─────────┴────────┴───────┴────────┴───────┴────┘│
+│                                                                   │
+│  ████ = Granted    (blank) = No access    ░░░░ = Read-only       │
+│                                                                   │
+│  Key: Each column is a SEPARATE IAM policy attached to ONLY      │
+│  the function that needs it. No shared roles. No wildcards.      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Pattern Summary Table
+
+| # | Pattern | Implementation | AWS Service | Problem Solved |
+|---|---------|---------------|-------------|----------------|
+| 1 | **Microservices** | 6 single-purpose Lambda functions | Lambda | Blast radius containment, independent scaling |
+| 2 | **Backend for Frontend** | 2 API Gateways for 2 frontends | API Gateway | Different trust levels per frontend |
+| 3 | **API Gateway / Edge Gateway** | CloudFront path-based routing | CloudFront | Unified entry point, TLS termination, caching |
+| 4 | **Event-Driven / Pub-Sub** | EventBridge custom bus + rules | EventBridge | Decoupled async processing, extensibility |
+| 5 | **CQRS (Lite)** | Separate read/write APIs + IAM | API Gateway + IAM | Read/write optimization, security isolation |
+| 6 | **Static Content Hosting** | S3 + CloudFront SPAs | S3, CloudFront | Zero-server frontend, global caching |
+| 7 | **Valet Key** | Presigned S3 URLs | Lambda, S3 | Bypass Lambda payload limits, secure uploads |
+| 8 | **Bulkhead Isolation** | Separate CF/API/Lambda/IAM per zone | All | Failure isolation between public/admin/async |
+| 9 | **Dead Letter Queue** | SQS DLQs for async failures | SQS | No silent failures, investigation + replay |
+| 10 | **Canary Deployment** | CodeDeploy 10%/5min traffic shift | CodeDeploy | Safe rollouts, automatic rollback |
+| 11 | **Immutable Infrastructure** | 100% Terraform, no manual changes | Terraform | Reproducibility, auditability, drift prevention |
+| 12 | **Zero Trust / Least Privilege** | 16 per-function IAM policies | IAM | Minimize attack surface per function |
+
+---
+
+## Service Dependency Map
+
+A complete view of how every AWS service connects in this platform.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       SERVICE DEPENDENCY MAP                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│                          ┌──────────┐                                    │
+│                          │  GitHub  │                                    │
+│                          │  (Source)│                                    │
+│                          └────┬─────┘                                    │
+│                  ┌────────────┼────────────┐                             │
+│                  ▼            ▼            ▼                              │
+│           ┌──────────┐ ┌──────────┐ ┌──────────┐                        │
+│           │CodePipeline│CodePipeline│CodePipeline│                       │
+│           │ Backend  │ │  Admin   │ │  Public  │                        │
+│           └────┬─────┘ └────┬─────┘ └────┬─────┘                        │
+│                │            │            │                                │
+│           ┌────▼─────┐ ┌───▼──────┐ ┌───▼──────┐                        │
+│           │CodeBuild │ │CodeBuild │ │CodeBuild │                        │
+│           └────┬─────┘ └────┬─────┘ └────┬─────┘                        │
+│                │            │            │                                │
+│           ┌────▼─────┐     │            │           ┌──────────┐        │
+│           │CodeDeploy│     │            │           │  SSM     │        │
+│           │ (Canary) │     │            │◄──────────│ Parameter│        │
+│           └────┬─────┘     │            │           │ Store    │        │
+│                │            │            │           └──────────┘        │
+│                ▼            ▼            ▼                                │
+│  ┌─────────────────────────────────────────────────────┐                │
+│  │                    AWS LAMBDA (x6)                    │                │
+│  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐       │                │
+│  │  │ Admin  │ │ Public │ │ Leads  │ │Presign │       │                │
+│  │  │ Posts  │ │ Posts  │ │        │ │        │       │                │
+│  │  └───┬────┘ └───┬────┘ └───┬────┘ └───┬────┘       │                │
+│  │      │          │          │          │              │                │
+│  │  ┌────────┐ ┌────────┐                               │                │
+│  │  │ Notif. │ │Cleanup │  (EventBridge-triggered)      │                │
+│  │  └───┬────┘ └───┬────┘                               │                │
+│  │      │          │    ┌──────────────────────┐        │                │
+│  │      │          │    │  Shared Lambda Layer │        │                │
+│  │      │          │    │  (AWS SDK + X-Ray)   │        │                │
+│  │      │          │    └──────────────────────┘        │                │
+│  └──────┼──────────┼───────────────────────────────────┘                │
+│         │          │                                                     │
+│    ┌────▼────┐ ┌───▼─────┐  ┌──────────┐  ┌──────────┐                │
+│    │  SES    │ │   S3    │  │ DynamoDB │  │EventBridge│                │
+│    │ (Email) │ │ (Media) │  │ (Posts + │  │ (Custom   │                │
+│    └─────────┘ └─────────┘  │  Leads)  │  │  Bus)     │                │
+│                              └──────────┘  └─────┬─────┘                │
+│                                                    │                     │
+│                                              ┌─────▼─────┐              │
+│  ┌──────────┐    ┌──────────┐               │  SQS DLQs │              │
+│  │CloudFront│───►│    S3    │               │ (x3)      │              │
+│  │ (x2)     │───►│ Frontend │               └─────┬─────┘              │
+│  │          │───►│ + Media  │                     │                     │
+│  └──────────┘    └──────────┘               ┌─────▼─────┐              │
+│       │                                      │CloudWatch │              │
+│       │          ┌──────────┐               │ Alarms    │              │
+│       └─────────►│ API GW   │               └─────┬─────┘              │
+│                  │ (x2)     │                     │                     │
+│                  └────┬─────┘               ┌─────▼─────┐              │
+│                       │                      │   SNS     │              │
+│                  ┌────▼─────┐               │ (Email)   │              │
+│                  │ Cognito  │               └───────────┘              │
+│                  │ (Admin   │                                           │
+│                  │  only)   │                                           │
+│                  └──────────┘                                           │
+│                                                                          │
+│  ┌────────────────────────────────────────────────┐                     │
+│  │             OBSERVABILITY PLANE                  │                     │
+│  │  X-Ray ◄── All Lambdas + API Gateways          │                     │
+│  │  CloudWatch Logs ◄── All Lambdas                │                     │
+│  │  CloudWatch Metrics ◄── All Services            │                     │
+│  │  CloudWatch Dashboard ◄── Unified view          │                     │
+│  └────────────────────────────────────────────────┘                     │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Request Lifecycle
+
+### Complete Request Trace: Public Blog Read
+
+Every hop is instrumented with X-Ray. This is what a single request looks like end-to-end.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  REQUEST LIFECYCLE: GET /api/posts                                    │
+│  Total latency: ~50-200ms (warm) | ~300-800ms (cold start)          │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  ┌─────────┐    TLS 1.2    ┌────────────┐                            │
+│  │ Browser │──────────────►│ CloudFront │  ~5-20ms (edge routing)    │
+│  └─────────┘               │            │                             │
+│                             │ CF Function│  ~1ms (path rewrite)       │
+│                             │ /api/posts │  strips /api/ prefix       │
+│                             │  → /posts  │                             │
+│                             └─────┬──────┘                            │
+│                                   │                                    │
+│                                   ▼                                    │
+│                            ┌────────────┐                             │
+│                            │ API Gateway│  ~10-30ms                   │
+│                            │ (Public)   │  throttle check             │
+│                            │            │  CloudWatch log             │
+│                            │ No auth    │  X-Ray segment start        │
+│                            └─────┬──────┘                            │
+│                                   │                                    │
+│                                   ▼                                    │
+│                            ┌────────────┐                             │
+│                            │  Lambda    │  ~5-15ms (warm invoke)      │
+│                            │ public_    │  ~200-500ms (cold start)    │
+│                            │ posts      │                             │
+│                            │            │  Structured log:            │
+│                            │ 1. Log req │  { correlationId, level }  │
+│                            │ 2. Open    │                             │
+│                            │    X-Ray   │  X-Ray subsegment:          │
+│                            │    subseg  │  "DynamoDB-QueryPosts"      │
+│                            │ 3. Query   │                             │
+│                            │    DynamoDB│                             │
+│                            │ 4. Close   │                             │
+│                            │    subseg  │                             │
+│                            │ 5. Return  │                             │
+│                            └─────┬──────┘                            │
+│                                   │                                    │
+│                                   ▼                                    │
+│                            ┌────────────┐                             │
+│                            │  DynamoDB  │  ~5-10ms (single-digit ms) │
+│                            │            │                             │
+│                            │ Query on   │  Index: publishedAtIndex    │
+│                            │ GSI        │  PK: status = "PUBLISHED"  │
+│                            │            │  SK: sorted by publishedAt  │
+│                            └────────────┘                            │
+│                                                                        │
+│  Response: 200 OK + JSON array of published posts                    │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │  OBSERVABILITY TRAIL FOR THIS REQUEST                        │    │
+│  │                                                               │    │
+│  │  X-Ray:       Trace ID spans CF → API GW → Lambda → DDB    │    │
+│  │  CloudWatch:  Structured JSON log with correlationId        │    │
+│  │  Metrics:     Invocation count, duration, no errors         │    │
+│  │  Dashboard:   Visible in Lambda + API GW + DynamoDB widgets │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Complete Request Trace: Admin Media Upload
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  REQUEST LIFECYCLE: Media Upload (2-phase)                            │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  PHASE 1: Get presigned URL (~100ms)                                 │
+│  ─────────────────────────────────────                                │
+│  Browser ──► CloudFront ──► API GW (Admin) ──► Cognito JWT check     │
+│                                                    │                  │
+│                                               ┌────▼──────┐          │
+│                                               │  Presign   │          │
+│                                               │  Lambda    │          │
+│                                               │            │          │
+│                                               │ Validate:  │          │
+│                                               │ image/jpeg │ ✓        │
+│                                               │ text/html  │ ✗ 400    │
+│                                               │            │          │
+│                                               │ Generate:  │          │
+│                                               │ S3 presign │          │
+│                                               │ (300s TTL) │          │
+│                                               └────┬───────┘          │
+│                                                    │                  │
+│  Browser ◄── { url: "https://s3...?X-Amz-..." } ──┘                 │
+│                                                                        │
+│  PHASE 2: Direct upload to S3 (~varies by file size)                 │
+│  ────────────────────────────────────────────────────                 │
+│  Browser ──────── PUT (presigned URL) ──────────► S3 Media Bucket    │
+│           │                                                           │
+│           │  No API Gateway in this path                             │
+│           │  No Lambda in this path                                  │
+│           │  No 6MB payload limit                                    │
+│           │  Direct HTTPS to S3                                      │
+│                                                                        │
+│  PHASE 3: Serve via CDN                                              │
+│  ───────────────────────                                             │
+│  Browser ──► CloudFront /media/image.jpg ──► S3 (OAC) ──► Image     │
+└──────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -855,11 +1547,136 @@ Same pattern as admin frontend — build, sync to S3, invalidate CloudFront cach
 
 ---
 
+## Deployment Strategy Visualized
+
+### Pipeline Trigger Matrix
+
+Which code changes trigger which pipelines:
+
+```
+┌────────────────────────┬───────────┬───────────┬───────────┐
+│   Files Changed         │ Backend   │ Admin FE  │ Public FE │
+│                         │ Pipeline  │ Pipeline  │ Pipeline  │
+├────────────────────────┼───────────┼───────────┼───────────┤
+│ backend/**              │    ✓      │           │           │
+│ buildspec.backend.yml   │    ✓      │           │           │
+│ admin-frontend/**       │           │    ✓      │           │
+│ buildspec.admin-fe.yml  │           │    ✓      │           │
+│ public-frontend/**      │           │           │    ✓      │
+│ buildspec.public-fe.yml │           │           │    ✓      │
+│ infrastructure/**       │           │           │           │
+│ readme.md               │           │           │           │
+└────────────────────────┴───────────┴───────────┴───────────┘
+                                         Independent triggers
+                                         No cross-pipeline deps
+```
+
+### Backend Change Detection Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│             SMART CHANGE DETECTION (git diff)                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  git diff HEAD~1 --name-only                                     │
+│       │                                                           │
+│       ▼                                                           │
+│  ┌──────────────────────────────┐                                │
+│  │ Changed files:                │                                │
+│  │ • backend/leads_lambda/       │                                │
+│  │ • backend/notifications_lambda│                                │
+│  └──────────┬───────────────────┘                                │
+│             │                                                     │
+│             ▼                                                     │
+│  ┌─────────────────────────┐    ┌─────────────────────────┐     │
+│  │ Layer changed?           │    │                          │     │
+│  │ blog_lambda_layer/       │    │                          │     │
+│  │                          │    │                          │     │
+│  │  YES → Rebuild ALL 6     │    │  NO → Rebuild only      │     │
+│  │         lambdas          │    │        changed ones     │     │
+│  └─────────────────────────┘    └───────────┬─────────────┘     │
+│                                               │                   │
+│                                               ▼                   │
+│                               ┌───────────────────────────┐     │
+│                               │ Only rebuild + deploy:     │     │
+│                               │ • leads_lambda        ✓   │     │
+│                               │ • notifications_lambda ✓   │     │
+│                               │ • admin_blog_posts     ✗   │     │
+│                               │ • public_posts         ✗   │     │
+│                               │ • presign_lambda       ✗   │     │
+│                               │ • cleanup_lambda       ✗   │     │
+│                               └───────────────────────────┘     │
+│                                                                   │
+│  Result: Faster deploys, smaller blast radius                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### End-to-End Backend Deploy Timeline
+
+```
+Time ═══════════════════════════════════════════════════════════════►
+
+ T+0s          T+30s          T+90s         T+120s        T+420s
+  │              │              │              │              │
+  ▼              ▼              ▼              ▼              ▼
+┌─────┐    ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+│ Git │───►│CodeBuild │─►│ Publish  │─►│ Canary   │─►│ Complete │
+│Push │    │          │  │ Lambda   │  │ 10%      │  │ 100%     │
+│     │    │ • detect │  │ versions │  │ traffic  │  │ traffic  │
+│     │    │   changes│  │          │  │          │  │          │
+│     │    │ • npm i  │  │ Upload   │  │ Monitor  │  │ Or auto  │
+│     │    │ • zip    │  │ to AWS   │  │ alarms   │  │ rollback │
+└─────┘    └──────────┘  └──────────┘  └──────────┘  └──────────┘
+
+           ◄──── Build ───►◄── Publish ►◄─── 5min watch ──►◄─Done─►
+```
+
+---
+
 ## Observability & Monitoring
 
 ### Three Pillars of Observability
 
-This project implements all three pillars:
+This project implements all three pillars of observability:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                   THREE PILLARS OF OBSERVABILITY                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│    ┌──────────────────┐  ┌──────────────────┐  ┌────────────────┐   │
+│    │   LOGS            │  │   TRACES          │  │   METRICS      │   │
+│    │   (CloudWatch)    │  │   (X-Ray)         │  │  (CloudWatch)  │   │
+│    ├──────────────────┤  ├──────────────────┤  ├────────────────┤   │
+│    │                    │  │                    │  │                │   │
+│    │ Structured JSON    │  │ Distributed        │  │ Alarms on     │   │
+│    │ per Lambda         │  │ request tracing    │  │ every service │   │
+│    │                    │  │                    │  │                │   │
+│    │ • level            │  │ • API GW → Lambda  │  │ • Lambda      │   │
+│    │ • message          │  │ • Lambda → DDB     │  │   errors      │   │
+│    │ • timestamp        │  │ • Lambda → EB      │  │ • API GW 5xx  │   │
+│    │ • correlationId    │  │ • Lambda → S3      │  │ • DDB throttle│   │
+│    │ • coldStart        │  │ • Lambda → SES     │  │ • CF errors   │   │
+│    │ • custom fields    │  │                    │  │ • DLQ depth   │   │
+│    │                    │  │ Custom annotations:│  │ • EB failures │   │
+│    │ 7-day retention    │  │ • correlationId    │  │                │   │
+│    │ 1 group per Lambda │  │ • coldStart        │  │ All → SNS     │   │
+│    │                    │  │ • postId/leadId    │  │      → Email  │   │
+│    │                    │  │                    │  │                │   │
+│    │ ANSWERS:           │  │ ANSWERS:           │  │ ANSWERS:      │   │
+│    │ "What happened?"   │  │ "Where is the      │  │ "Is it        │   │
+│    │                    │  │  bottleneck?"       │  │  broken?"     │   │
+│    └──────────────────┘  └──────────────────┘  └────────────────┘   │
+│                                                                       │
+│              ┌─────────────────────────────────┐                     │
+│              │     UNIFIED DASHBOARD            │                     │
+│              │     (Single pane of glass)       │                     │
+│              │                                   │                     │
+│              │     Combines all three pillars    │                     │
+│              │     across all 18 AWS services    │                     │
+│              └─────────────────────────────────┘                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ### 1. Structured Logging (CloudWatch Logs)
 
@@ -970,6 +1787,85 @@ A comprehensive dashboard (`cloudwatch_dashboard.tf`) provides a single-pane-of-
 | **EventBridge** | Rule invocations, failed invocations, matched events |
 | **CI/CD** | Pipeline execution counts, build durations, success/failure rates |
 
+### Dashboard Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                   CLOUDWATCH DASHBOARD LAYOUT                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  SLA / SLI OVERVIEW                                          │    │
+│  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │    │
+│  │  │ Lambda │ │ API GW │ │ DDB    │ │ CF     │ │ DLQs   │   │    │
+│  │  │ OK ✓   │ │ OK ✓   │ │ OK ✓   │ │ OK ✓   │ │ OK ✓   │   │    │
+│  │  └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+│  ┌───────────────────────────┐  ┌───────────────────────────┐      │
+│  │  LAMBDA INVOCATIONS       │  │  LAMBDA ERRORS             │      │
+│  │  ▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▂▃▄▅▆   │  │  ▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▁▁▁   │      │
+│  │  admin ── public ── leads │  │  admin ── public ── leads │      │
+│  └───────────────────────────┘  └───────────────────────────┘      │
+│                                                                       │
+│  ┌───────────────────────────┐  ┌───────────────────────────┐      │
+│  │  LAMBDA DURATION (p99)    │  │  API GW LATENCY (p50/p99) │      │
+│  │  ▂▃▂▃▂▄▃▂▃▂▃▂▃▂▃▂▃▂▃▂   │  │  ▂▃▂▂▃▂▃▂▂▃▂▃▂▂▃▂▃▂▃▂   │      │
+│  │  250ms avg               │  │  public ── admin           │      │
+│  └───────────────────────────┘  └───────────────────────────┘      │
+│                                                                       │
+│  ┌───────────────────────────┐  ┌───────────────────────────┐      │
+│  │  API GW REQUESTS          │  │  API GW 4xx/5xx            │      │
+│  │  ▃▅▇█▇▅▃▅▇█▇▅▃▅▇█▇▅▃▅   │  │  ▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▁   │      │
+│  │  public ── admin          │  │  4xx ── 5xx                │      │
+│  └───────────────────────────┘  └───────────────────────────┘      │
+│                                                                       │
+│  ┌───────────────────────────┐  ┌───────────────────────────┐      │
+│  │  DYNAMODB CONSUMED CAP    │  │  CLOUDFRONT CACHE HIT RATE │      │
+│  │  ▃▂▃▂▃▅▃▂▃▂▃▂▃▂▃▅▃▂▃▂   │  │  ▇▇▇▇▆▇▇▇▇▆▇▇▇▇▆▇▇▇▇▆   │      │
+│  │  reads ── writes          │  │  ~95% cache hit rate       │      │
+│  └───────────────────────────┘  └───────────────────────────┘      │
+│                                                                       │
+│  ┌───────────────────────────┐  ┌───────────────────────────┐      │
+│  │  SQS DLQ MESSAGE COUNT    │  │  EVENTBRIDGE INVOCATIONS   │      │
+│  │  ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁   │  │  ▂▃▂▃▂▃▂▃▂▃▂▃▂▃▂▃▂▃▂▃   │      │
+│  │  notifications ── cleanup │  │  leads-rule ── delete-rule │      │
+│  │  (ideally always 0)       │  │                            │      │
+│  └───────────────────────────┘  └───────────────────────────┘      │
+│                                                                       │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  CI/CD PIPELINE HEALTH                                       │    │
+│  │  Backend: ✓✓✓✓✗✓✓✓    Admin FE: ✓✓✓✓✓    Public FE: ✓✓✓  │    │
+│  │  Build duration: ~90s avg                                    │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Alarm Escalation Flow
+
+```
+Service Metric Exceeds Threshold
+         │
+         ▼
+┌─────────────────┐
+│ CloudWatch Alarm │
+│ State: ALARM     │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ SNS Topic        │
+│ sblg-cw-alarms   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐         ┌─────────────────┐
+│ Email            │         │ [Future]         │
+│ Notification     │         │ Slack / PagerDuty│
+│ to Ops Team      │         │ via AWS Chatbot  │
+└─────────────────┘         └─────────────────┘
+```
+
 ---
 
 ## Security Deep Dive
@@ -1021,6 +1917,151 @@ Layer 6: Application
 | No wildcard permissions | Every IAM action targets a specific resource ARN |
 | Presigned URL expiry | 5-minute window limits exposure of upload URLs |
 | DLQs for async failures | Failed events are captured, not silently dropped |
+
+---
+
+## Data Flow Diagrams
+
+### Synchronous vs Asynchronous Data Paths
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    DATA FLOW CLASSIFICATION                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  SYNCHRONOUS PATHS (user waits for response)                        │
+│  ─────────────────────────────────────────                          │
+│                                                                       │
+│  Read Post:    Browser ──► CF ──► API GW ──► Lambda ──► DynamoDB    │
+│                Browser ◄── CF ◄── API GW ◄── Lambda ◄── DynamoDB    │
+│                ~50-200ms round trip                                   │
+│                                                                       │
+│  Create Post:  Browser ──► API GW ──► Cognito ──► Lambda ──► DDB    │
+│                Browser ◄── API GW ◄────────────── Lambda ◄── DDB    │
+│                ~100-300ms round trip                                  │
+│                                                                       │
+│  Upload Media: Browser ──► API GW ──► Lambda ──► S3 Presign         │
+│                Browser ◄── API GW ◄── Lambda ◄── (URL)              │
+│                Browser ──────────────────────────► S3 (direct PUT)   │
+│                ~100ms + upload time                                   │
+│                                                                       │
+│  ASYNCHRONOUS PATHS (fire-and-forget, user doesn't wait)            │
+│  ────────────────────────────────────────────────────               │
+│                                                                       │
+│  Lead Email:   Lambda ──► EventBridge ──► Notif. Lambda ──► SES     │
+│                (original request already returned 201)                │
+│                If SES fails: retry x10 ──► DLQ ──► Alarm            │
+│                                                                       │
+│  Post Cleanup: Lambda ──► EventBridge ──► Cleanup Lambda ──► S3 Del │
+│                (DELETE response already returned 200)                 │
+│                If S3 fails: retry x10 ──► DLQ ──► Alarm             │
+│                                                                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Post Lifecycle State Machine
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    POST LIFECYCLE STATES                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│                    POST /admin/posts                                  │
+│                          │                                            │
+│                          ▼                                            │
+│                   ┌──────────────┐                                   │
+│                   │    DRAFT     │ ◄─── POST /admin/posts/{id}/      │
+│                   │              │           unpublish                │
+│                   └──────┬───────┘                                   │
+│                          │                                            │
+│               POST /admin/posts/{id}/publish                         │
+│                          │                                            │
+│                          ▼                                            │
+│                   ┌──────────────┐                                   │
+│                   │  PUBLISHED   │ ◄─── POST /admin/posts/{id}/      │
+│                   │              │           unarchive                │
+│                   │ (visible on  │                                    │
+│                   │  public blog)│                                    │
+│                   └──────┬───────┘                                   │
+│                          │                                            │
+│               POST /admin/posts/{id}/archive                         │
+│                          │                                            │
+│                          ▼                                            │
+│                   ┌──────────────┐                                   │
+│                   │  ARCHIVED    │                                    │
+│                   │              │                                    │
+│                   │ (hidden from │                                    │
+│                   │  public blog)│                                    │
+│                   └──────────────┘                                   │
+│                                                                       │
+│               DELETE /admin/posts/{id} (from any state)              │
+│                          │                                            │
+│                          ▼                                            │
+│                   ┌──────────────┐         ┌──────────────┐          │
+│                   │   DELETED    │────────►│ EventBridge  │          │
+│                   │ (DynamoDB    │  async   │ PostDeleted  │          │
+│                   │  removed)    │         │     │        │          │
+│                   └──────────────┘         │     ▼        │          │
+│                                            │ Cleanup      │          │
+│                                            │ Lambda       │          │
+│                                            │ (S3 delete)  │          │
+│                                            └──────────────┘          │
+│                                                                       │
+│  GSI Query: publishedAtIndex (status=PUBLISHED, sort by publishedAt) │
+│  Only PUBLISHED posts appear on the public blog                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Lead Submission — Complete Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│              LEAD SUBMISSION: FULL DATA FLOW                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌──────────┐                                                        │
+│  │  User    │  POST /leads                                           │
+│  │  Browser │  { name: "John", email: "j@x.com", message: "Hi" }   │
+│  └────┬─────┘                                                        │
+│       │                                                               │
+│       ▼                                                               │
+│  ┌──────────┐  Validate request body                                 │
+│  │  Leads   │  ├── name required?     ✓                              │
+│  │  Lambda  │  ├── email required?    ✓                              │
+│  │          │  └── message required?  ✓                              │
+│  │          │                                                        │
+│  │          │  Write to DynamoDB ──────────────►┌──────────┐         │
+│  │          │  PutItem { leadID: uuid, ... }    │  Leads   │         │
+│  │          │                                    │  Table   │         │
+│  │          │  Emit event ────────────────────►┌┤──────────┤         │
+│  │          │  { source: "app.leads",          ││EventBridge│        │
+│  │          │    detail-type: "LeadCreated" }  │└──────────┘         │
+│  │          │                                    │                    │
+│  │          │◄── Return 201 Created              │                    │
+│  └────┬─────┘                                    │                    │
+│       │                                          │                    │
+│       ▼                                          ▼                    │
+│  User sees                               ┌──────────────┐           │
+│  "Thank you"                             │ Notifications│           │
+│  message                                 │ Lambda       │           │
+│  (doesn't wait                           │              │           │
+│   for email)                             │ Validate     │           │
+│                                           │ event detail │           │
+│                                           │      │       │           │
+│                                           │      ▼       │           │
+│                                           │ SES SendEmail│           │
+│                                           │ To: admin    │           │
+│                                           │ Subject:     │           │
+│                                           │ "New Lead"   │           │
+│                                           └──────┬───────┘           │
+│                                                  │                    │
+│                                         ┌────────▼────────┐          │
+│                                         │  Admin Inbox     │          │
+│                                         │  📧 New lead     │          │
+│                                         │  from John       │          │
+│                                         └─────────────────┘          │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -1183,6 +2224,174 @@ All DLQs have CloudWatch alarms — when messages appear, the operations team is
 | SES email fails | Notification Lambda fails → EventBridge retries → DLQ |
 | Canary deployment unhealthy | CodeDeploy auto-rolls back to previous version |
 | CloudFront origin error | 5xx alarm fires → SNS notification |
+
+### Resilience Decision Tree
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    FAILURE HANDLING DECISION TREE                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  Request arrives                                                     │
+│       │                                                               │
+│       ├── Synchronous path? (API call)                               │
+│       │       │                                                       │
+│       │       ├── Lambda error                                       │
+│       │       │       └── Return 5xx to client                       │
+│       │       │           └── CloudWatch alarm → SNS → Email         │
+│       │       │               └── Client retries (frontend logic)    │
+│       │       │                                                       │
+│       │       ├── DynamoDB throttled                                  │
+│       │       │       └── Lambda catches → 429 to client             │
+│       │       │           └── CloudWatch throttle alarm fires        │
+│       │       │                                                       │
+│       │       └── Cold start                                         │
+│       │               └── Not a failure — tracked via X-Ray          │
+│       │                   annotation + structured log                │
+│       │                                                               │
+│       └── Asynchronous path? (EventBridge)                           │
+│               │                                                       │
+│               ├── Target Lambda fails                                │
+│               │       └── EventBridge retries (up to 10x)           │
+│               │               │                                       │
+│               │               ├── Succeeds on retry → Done          │
+│               │               │                                       │
+│               │               └── Exhausts retries                   │
+│               │                       └── Message → SQS DLQ         │
+│               │                           └── CloudWatch alarm       │
+│               │                               └── SNS → Email       │
+│               │                                                       │
+│               └── EventBridge itself fails                           │
+│                       └── Event → EventBridge DLQ                    │
+│                           └── CloudWatch alarm → SNS → Email         │
+│                                                                       │
+│  Deployment failure                                                  │
+│       │                                                               │
+│       └── Canary alarm fires during 5-min watch                     │
+│               └── CodeDeploy auto-rollback to previous version      │
+│                   └── 100% traffic restored to known-good version    │
+│                                                                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Cost Architecture
+
+### Pay-Per-Use Model
+
+Every service in this platform follows a pay-per-use model — zero traffic means near-zero cost.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                       COST MODEL BY SERVICE                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  Service           Billing Model        Cost at Rest   Cost Drivers  │
+│  ───────           ─────────────        ────────────   ────────────  │
+│                                                                       │
+│  Lambda            Per invocation       $0             Invocations,   │
+│                    + duration                          memory, duration│
+│                                                                       │
+│  API Gateway       Per request          $0             Request count  │
+│                                                                       │
+│  DynamoDB          Per read/write       ~$0            RCU/WCU usage │
+│                    (on-demand)                         Storage (GB)   │
+│                                                                       │
+│  S3                Per request          ~$0.02/GB      Storage,       │
+│                    + storage                           requests       │
+│                                                                       │
+│  CloudFront        Per request          $0             Data transfer, │
+│                    + data transfer                     requests       │
+│                                                                       │
+│  EventBridge       Per event            $0             Events         │
+│                                                        published      │
+│                                                                       │
+│  SES               Per email            $0             Emails sent    │
+│                                                                       │
+│  CloudWatch        Per metric/log       ~$0.50         Metrics,       │
+│                                                        log storage    │
+│                                                                       │
+│  CodePipeline      Per pipeline/month   ~$3.00         3 pipelines    │
+│                                                                       │
+│  Cognito           Per MAU              $0 (first 50K) Monthly active │
+│                                                        users          │
+│                                                                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Cost Optimization Strategies Applied
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                   COST OPTIMIZATION MAP                               │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  COMPUTE                                                       │  │
+│  │  ✓ Lambda (no idle server costs)                              │  │
+│  │  ✓ Shared Lambda Layer (smaller deployment packages)          │  │
+│  │  ✓ No provisioned concurrency (pay only for actual use)       │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                       │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  DATABASE                                                      │  │
+│  │  ✓ On-demand DynamoDB (no over-provisioned capacity)          │  │
+│  │  ✓ GSI queries instead of scans (lower RCU consumption)       │  │
+│  │  ✓ Contributor Insights for hot partition detection            │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                       │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  STORAGE                                                       │  │
+│  │  ✓ S3 lifecycle: STANDARD → STANDARD_IA after 30 days        │  │
+│  │  ✓ Non-current version expiry after 365 days                  │  │
+│  │  ✓ Presigned URLs (no Lambda/API GW data transfer for uploads)│  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                       │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  DELIVERY                                                      │  │
+│  │  ✓ CloudFront caching (reduces S3 origin requests)            │  │
+│  │  ✓ SPA architecture (static files, no server rendering)       │  │
+│  │  ✓ Path-based routing (single domain, single certificate)     │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                       │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  OBSERVABILITY                                                 │  │
+│  │  ✓ 7-day log retention (not default 30 days)                  │  │
+│  │  ✓ ERROR-level API GW logging only (not INFO)                 │  │
+│  │  ✓ Smart change detection (only deploy modified Lambdas)      │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Scaling Cost Curve
+
+```
+Cost ($)
+  │
+  │                                              ╱ Traditional Server
+  │                                           ╱   (EC2/ECS)
+  │                                        ╱
+  │                                     ╱       ╱ This Platform
+  │                                  ╱       ╱   (Serverless)
+  │                               ╱       ╱
+  │                            ╱       ╱
+  │                         ╱      ╱
+  │                      ╱     ╱
+  │  Server baseline  ╱    ╱
+  │  cost ($50+/mo) ╱  ╱
+  │──────────────╱╱
+  │           ╱╱
+  │        ╱╱
+  │     ╱╱    Serverless: ~$0 at rest
+  │  ╱╱       Linear cost growth with usage
+  │╱╱
+  └──────────────────────────────────────────── Traffic
+        Low              Medium            High
+
+  Serverless advantage: No baseline cost. Pay starts at first request.
+  Break-even: Typically at sustained high traffic (millions of req/month).
+```
 
 ---
 

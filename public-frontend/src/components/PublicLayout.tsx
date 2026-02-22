@@ -12,6 +12,7 @@ export const PublicLayout = () => {
 
           <nav className="site-nav" aria-label="Main navigation">
             <Link to="/posts">All Posts</Link>
+            <Link to="/contact">Contact</Link>
           </nav>
         </div>
       </header>

@@ -53,6 +53,13 @@ module "ssm_parameters" {
       description = "CloudFront CDN URL for public frontend media assets"
       overwrite     = true
 
+    },
+     {
+      name        = "/${var.name_prefix}/admin_frontend/media_cdn_url"
+      value       = "https://${module.cloudfront_admin.cloudfront_domain_name}"
+      description = "CloudFront CDN URL for admin frontend media assets"
+      overwrite     = true
+
     }
   ]
 

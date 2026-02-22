@@ -36,8 +36,9 @@ module "ssm_parameters" {
     },
     {
       name        = "/${var.name_prefix}/media/cdn_url"
-      value       = module.cloudfront_public.cloudfront_domain_name
+      value       = "https://${module.cloudfront_public.cloudfront_domain_name}"
       description = "CDN URL for media assets"
+        overwrite     = true
 
     },
     {
@@ -48,8 +49,9 @@ module "ssm_parameters" {
     },
     {
       name        = "/${var.name_prefix}/public_frontend/media_cdn_url"
-      value       = module.cloudfront_public.cloudfront_domain_name
+      value       = "https://${module.cloudfront_public.cloudfront_domain_name}"
       description = "CloudFront CDN URL for public frontend media assets"
+      overwrite     = true
 
     }
   ]

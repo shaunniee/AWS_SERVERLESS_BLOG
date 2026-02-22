@@ -226,6 +226,30 @@ module "admin_api" {
       resource_key  = "leadId"
       authorization = "NONE"
     }
+    # CORS Preflight options for /admin/posts/{postId}/publish
+    publish_options = {
+      http_method   = "OPTIONS"
+      resource_key  = "publish"
+      authorization = "NONE"
+    }
+    # CORS Preflight options for /admin/posts/{postId}/unpublish
+    unpublish_options = {
+      http_method   = "OPTIONS"
+      resource_key  = "unpublish"
+      authorization = "NONE"  
+    }
+    # CORS Preflight options for /admin/posts/{postId}/archive
+    archive_options = {
+      http_method   = "OPTIONS"
+      resource_key  = "archive" 
+      authorization = "NONE"
+    }
+    # CORS Preflight options for /admin/posts/{postId}/unarchive
+    unarchive_options = {
+      http_method   = "OPTIONS"
+      resource_key  = "unarchive"
+      authorization = "NONE"
+    }
 
 
   }
@@ -399,6 +423,63 @@ module "admin_api" {
             EOF
       }
     }
+
+    # CORS Preflight options for /admin/posts/{postId}/publish
+    publish_options = {
+      method_key              = "publish_options"
+      integration_http_method = "OPTIONS"
+      type                    = "MOCK"
+      uri                     = null
+      request_templates = {
+        "application/json" = <<EOF
+            {
+                "statusCode": 200 
+                }
+            EOF
+      }
+    }
+    # CORS Preflight options for /admin/posts/{postId}/unpublish
+    unpublish_options = {
+      method_key              = "unpublish_options"
+      integration_http_method = "OPTIONS"
+      type                    = "MOCK"
+      uri                     = null
+      request_templates = {
+        "application/json" = <<EOF
+            {
+                "statusCode": 200 
+                }
+            EOF
+      }
+    }
+    # CORS Preflight options for /admin/posts/{postId}/archive
+    archive_options = {
+      method_key              = "archive_options"
+      integration_http_method = "OPTIONS"
+      type                    = "MOCK"
+      uri                     = null
+      request_templates = {
+        "application/json" = <<EOF
+            {
+                "statusCode": 200 
+                }
+            EOF
+      }
+    }
+    # CORS Preflight options for /admin/posts/{postId}/unarchive
+    unarchive_options = {
+      method_key              = "unarchive_options"
+      integration_http_method = "OPTIONS"
+      type                    = "MOCK"
+      uri                     = null
+      request_templates = {
+        "application/json" = <<EOF
+            {
+                "statusCode": 200
+                }
+            EOF
+      }
+    }
   }
 
   method_responses = {
@@ -444,6 +525,46 @@ module "admin_api" {
 
     leadId_options_200 = {
       method_key  = "leadId_options"
+      status_code = "200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = true
+        "method.response.header.Access-Control-Allow-Methods" = true
+        "method.response.header.Access-Control-Allow-Headers" = true
+      }
+    }
+
+    publish_options_200 = {
+      method_key  = "publish_options"
+      status_code = "200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = true
+        "method.response.header.Access-Control-Allow-Methods" = true
+        "method.response.header.Access-Control-Allow-Headers" = true
+      }
+    }
+
+    unpublish_options_200 = {
+      method_key  = "unpublish_options"
+      status_code = "200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = true
+        "method.response.header.Access-Control-Allow-Methods" = true
+        "method.response.header.Access-Control-Allow-Headers" = true
+      }
+    }
+
+    archive_options_200 = {
+      method_key  = "archive_options"
+      status_code = "200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = true
+        "method.response.header.Access-Control-Allow-Methods" = true
+        "method.response.header.Access-Control-Allow-Headers" = true
+      }
+    }
+
+    unarchive_options_200 = {
+      method_key  = "unarchive_options"
       status_code = "200"
       response_parameters = {
         "method.response.header.Access-Control-Allow-Origin"  = true
@@ -498,7 +619,43 @@ module "admin_api" {
         "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
       }
     }
+
+    publish_options_200 = {
+      method_response_key = "publish_options_200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+        "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
+      }
+    }
+
+    unpublish_options_200 = {
+      method_response_key = "unpublish_options_200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+        "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
+      }
+    }
+
+    archive_options_200 = {
+      method_response_key = "archive_options_200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+        "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
+      }
+    }
+
+    unarchive_options_200 = {
+      method_response_key = "unarchive_options_200"
+      response_parameters = {
+        "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+        "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+        "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-correlation-id'"
+      }
   }
+}
 }
 
 

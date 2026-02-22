@@ -97,6 +97,7 @@ module "admin_ci_cd" {
 
   name                   = "${var.name_prefix}-cicd-admin"
   create_artifact_bucket = true
+  create_kms_key         = true
   artifact_bucket_config = {
     versioning                 = true
     lifecycle_expiration_days  = 60

@@ -1,6 +1,6 @@
 <div align="center">
 
-# ☁️ AWS Serverless Blog Platform
+# ☁️ AWS Serverless Blog Platform (www.sblog.stsproj.com)
 
 ### A production-style, fully serverless blog platform built entirely on AWS
 

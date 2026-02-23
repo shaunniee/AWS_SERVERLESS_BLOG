@@ -106,11 +106,11 @@ flowchart TD
 
 ### Architecture Diagram
 
-> 📌 _Architecture diagram will be added here_
+![alt text](Architecture_v3.drawio.png)
 
 ### AWS X-Ray Trace Map
 
-> 📌 _X-Ray service map screenshot will be added here_
+![alt text](XrayTrace.png)
 
 ---
 
@@ -394,7 +394,7 @@ The three pillars of observability are all implemented.
 
 Every Lambda function and API Gateway stage is instrumented with X-Ray. A single user request produces a trace spanning CloudFront → API Gateway → Lambda → DynamoDB, with subsegments for each service call.
 
-> 📌 _X-Ray trace screenshot will be added here_
+![alt text](XrayTrace.png)
 
 ### 2 — Structured Logging: CloudWatch Logs
 

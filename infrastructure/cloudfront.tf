@@ -24,6 +24,8 @@ JS
 
 module "cloudfront_public" {
   source            = "git::https://github.com/shaunniee/terraform_modules.git//aws_cloudfront?ref=main"
+  aliases           = ["sblog.stsproj.com", "www.sblog.stsproj.com"]
+  acm_certificate_arn = module.acm.certificate_arns["stsproj.com"]
   distribution_name = "${var.name_prefix}-public-distribution"
     default_root_object = "index.html"
     spa_fallback        = true
@@ -149,6 +151,8 @@ JS
 
 module "cloudfront_admin" {
   source            = "git::https://github.com/shaunniee/terraform_modules.git//aws_cloudfront?ref=main"
+  aliases           = ["admin.sblog.stsproj.com", "www.admin.sblog.stsproj.com"]
+  acm_certificate_arn = module.acm.certificate_arns["stsproj.com"]
   distribution_name = "${var.name_prefix}-admin-distribution"
   default_root_object = "index.html"
     spa_fallback        = true

@@ -10,6 +10,12 @@ variable "aws_region" {
     default     = "eu-west-1"
 }
 
+variable "acm_region" {
+    description = "AWS region for ACM certificates used by CloudFront custom domains (must be us-east-1 for CloudFront)."
+    type        = string
+    default     = "us-east-1"
+}
+
 variable "name_prefix" {
     description = "A prefix to add to all resource names."
     type        = string

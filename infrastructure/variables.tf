@@ -36,3 +36,10 @@ variable "repo_branch" {
     description = "The branch to use for the CodeStar Connections source."
     type        = string
 }
+
+variable "hosted_zone_id" {
+    description = "The ID of the existing Route53 hosted zone to use for DNS records. If not provided, a new hosted zone will be created."
+    type        = string
+    default     = null
+
+}

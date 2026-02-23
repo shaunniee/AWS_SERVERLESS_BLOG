@@ -8,16 +8,16 @@
 # =============================================================================
 
 
-module "dns_zone" {
-  source = "./aws_route53"
+# module "dns_zone" {
+#   source = "git::https://github.com/shaunniee/terraform_modules.git//aws_route53?ref=main"
 
-  zones = {
-    main = {
-      domain_name = "stsproj.com"
-      comment     = "Primary public zone"
-    }
-  }
-}
+#   zones = {
+#     main = {
+#       domain_name = "stsproj.com"
+#       comment     = "Primary public zone"
+#     }
+#   }
+# }
 
 # =============================================================================
 # STEP 2: ACM — Certificate with DNS validation (needs zone_id from step 1)
@@ -33,9 +33,14 @@ module "acm" {
   certificates = [
     {
       domain_name       = "stsproj.com"
-      san               = ["*.stsproj.com"]
+      san               = [
+        "*.stsproj.com",
+        "www.sblog.stsproj.com",
+        "admin.sblog.stsproj.com",
+        "www.admin.sblog.stsproj.com"
+      ]
       validation_method = "DNS"
-      zone_id           = module.dns_zone.zone_ids["main"]
+      zone_id           = var.hosted_zone_id
     }
   ]
 }
@@ -45,7 +50,7 @@ module "dns_records" {
   source = "git::https://github.com/shaunniee/terraform_modules.git//aws_route53?ref=main"
 
   existing_zone_ids = {
-    main = module.dns_zone.zone_ids["main"]   # ← pass existing zone, don't recreate
+    main = var.hosted_zone_id  # ← pass existing zone, don't recreate
   }
 
   records = {

@@ -62,45 +62,46 @@ This is a **production-style serverless blog platform** built end-to-end on AWS 
 The platform is split into three clearly separated zones. Failure in one zone does not cascade to the others.
 
 ```mermaid
-flowchart TD
-    classDef publicStyle fill:#1a4f7a,stroke:#2e86c1,color:#fff,rx:6
-    classDef adminStyle fill:#145a32,stroke:#27ae60,color:#fff,rx:6
-    classDef asyncStyle fill:#4a235a,stroke:#9b59b6,color:#fff,rx:6
-    classDef dbStyle fill:#1b2631,stroke:#717d7e,color:#fff,rx:6
+flowchart LR
     classDef userStyle fill:#6e2f1a,stroke:#e59866,color:#fff
+    classDef publicStyle fill:#1a4f7a,stroke:#2e86c1,color:#fff
+    classDef adminStyle fill:#145a32,stroke:#27ae60,color:#fff
+    classDef asyncStyle fill:#4a235a,stroke:#9b59b6,color:#fff
+    classDef dbStyle fill:#2c3e50,stroke:#7f8c8d,color:#fff
     classDef busStyle fill:#784212,stroke:#f39c12,color:#fff
-    classDef alarmStyle fill:#7b241c,stroke:#e74c3c,color:#fff,rx:6
+    classDef alarmStyle fill:#7b241c,stroke:#e74c3c,color:#fff
 
     subgraph PUBLIC["🌍  Public Zone"]
-        direction TB
-        PB(["👤 User Browser"]):::userStyle --> PCF["☁️ CloudFront CDN"]:::publicStyle
-        PCF --> PS3["🗂️ S3 · React SPA"]:::publicStyle
-        PCF --> PAGW["🔓 API Gateway\nNo Auth"]:::publicStyle
-        PAGW --> PL["⚡ Lambda\nRead Only"]:::publicStyle
-        PL --> DDB[("🗄️ DynamoDB\nGSI Query")]:::dbStyle
+        PB(["👤 User"]):::userStyle --> PCF["☁️ CloudFront"]:::publicStyle
+        PCF --> PS3["🗂️ S3 SPA"]:::publicStyle
+        PCF --> PAGW["🔓 API Gateway"]:::publicStyle
+        PAGW --> PL["⚡ Lambda"]:::publicStyle
+        PL --> DDB[("🗄️ DynamoDB")]:::dbStyle
     end
 
     subgraph ADMIN["🔐  Admin Zone"]
-        direction TB
-        AB(["👤 Admin Browser"]):::userStyle --> ACF["☁️ CloudFront CDN"]:::adminStyle
-        ACF --> AS3["🗂️ S3 · React CMS"]:::adminStyle
-        ACF --> AAGW["🛡️ API Gateway\nCognito JWT"]:::adminStyle
-        AAGW --> AL["⚡ Lambda\nFull CRUD"]:::adminStyle
-        AL --> DDB2[("🗄️ DynamoDB\nFull R/W")]:::dbStyle
-        AL --> EB(["🚌 EventBridge Bus"]):::busStyle
+        AB(["👤 Admin"]):::userStyle --> ACF["☁️ CloudFront"]:::adminStyle
+        ACF --> AS3["🗂️ S3 CMS"]:::adminStyle
+        ACF --> AAGW["🛡️ API Gateway"]:::adminStyle
+        AAGW --> AL["⚡ Lambda"]:::adminStyle
+        AL --> DDB2[("🗄️ DynamoDB")]:::dbStyle
+        AL --> EB(["🚌 EventBridge"]):::busStyle
     end
 
     subgraph ASYNC["⚡  Async Zone"]
-        direction TB
-        EB --> NL["🔔 Notifications\nLambda"]:::asyncStyle
-        EB --> CL["🧹 Cleanup\nLambda"]:::asyncStyle
-        NL --> SES["📧 SES · Send Email"]:::asyncStyle
-        CL --> S3M["🗑️ S3 · Delete Media"]:::asyncStyle
-        NL -->|retries exhausted| DLQ1["⚠️ SQS DLQ"]:::alarmStyle
-        CL -->|retries exhausted| DLQ2["⚠️ SQS DLQ"]:::alarmStyle
-        DLQ1 --> CWA["🚨 CloudWatch Alarm"]:::alarmStyle
-        DLQ2 --> CWA
+        NL["🔔 Notifications Lambda"]:::asyncStyle --> SES["📧 SES"]:::asyncStyle
+        CL["🧹 Cleanup Lambda"]:::asyncStyle --> S3M["🗑️ S3 Media"]:::asyncStyle
+        NL -->|exhausted| DLQ1["⚠️ SQS DLQ"]:::alarmStyle
+        CL -->|exhausted| DLQ2["⚠️ SQS DLQ"]:::alarmStyle
+        DLQ1 & DLQ2 --> CWA["🚨 CloudWatch Alarm"]:::alarmStyle
     end
+
+    EB -->|LeadCreated| NL
+    EB -->|PostDeleted| CL
+
+    style PUBLIC fill:#0d2137,stroke:#2e86c1,color:#fff
+    style ADMIN fill:#0d2b1a,stroke:#27ae60,color:#fff
+    style ASYNC fill:#1e0d2b,stroke:#9b59b6,color:#fff
 ```
 
 ### Architecture Diagram
@@ -269,11 +270,11 @@ flowchart TD
     U(["👤 User"]):::userStyle -->|POST /leads| LL["⚡ Leads Lambda"]:::lambdaStyle
     A(["🔐 Admin"]):::userStyle -->|DELETE /admin/posts/:id| AL["⚡ Admin Lambda"]:::lambdaStyle
 
-    LL --> DDB1[("🗄️ DynamoDB\nWrite Lead")]:::dbStyle
+    LL --> DDB1[("🗄️ DynamoDB<br/>Write Lead")]:::dbStyle
     LL -->|"✅ instant 201"| U
     LL -->|"📤 emit LeadCreated"| EB(["🚌 EventBridge Bus"]):::busStyle
 
-    AL --> DDB2[("🗄️ DynamoDB\nDelete Post")]:::dbStyle
+    AL --> DDB2[("🗄️ DynamoDB<br/>Delete Post")]:::dbStyle
     AL -->|"✅ instant 200"| A
     AL -->|"📤 emit PostDeleted"| EB
 
@@ -345,18 +346,18 @@ flowchart TD
     classDef successStyle fill:#1d6a27,stroke:#2ecc71,color:#fff,rx:6
     classDef rollbackStyle fill:#7b241c,stroke:#e74c3c,color:#fff,rx:6
 
-    GH["📦 GitHub\nSource Code"]:::sourceStyle --> BE & AF & PF
+    GH["📦 GitHub<br/>Source Code"]:::sourceStyle --> BE & AF & PF
 
-    BE["🔧 Backend Pipeline"]:::sourceStyle --> CB_BE["🏗️ CodeBuild\nPackage Lambda ZIPs"]:::buildStyle
-    CB_BE --> CD["🚀 CodeDeploy\nCanary 10% · 5 min"]:::deployStyle
-    CD -->|"✅ healthy"| LIVE["✨ Lambda live alias\n100% v2"]:::successStyle
-    CD -->|"🚨 alarm fires"| RB["↩️ Auto Rollback\nto v1"]:::rollbackStyle
+    BE["🔧 Backend Pipeline"]:::sourceStyle --> CB_BE["🏗️ CodeBuild<br/>Package Lambda ZIPs"]:::buildStyle
+    CB_BE --> CD["🚀 CodeDeploy<br/>Canary 10% · 5 min"]:::deployStyle
+    CD -->|"✅ healthy"| LIVE["✨ Lambda live alias<br/>100% v2"]:::successStyle
+    CD -->|"🚨 alarm fires"| RB["↩️ Auto Rollback<br/>to v1"]:::rollbackStyle
 
-    AF["🖥️ Admin FE Pipeline"]:::sourceStyle --> CB_AF["🏗️ CodeBuild\nnpm build + SSM env inject"]:::buildStyle
-    CB_AF --> S3_AF["☁️ S3 Sync +\nCloudFront Invalidate"]:::deployStyle
+    AF["🖥️ Admin FE Pipeline"]:::sourceStyle --> CB_AF["🏗️ CodeBuild<br/>npm build + SSM env inject"]:::buildStyle
+    CB_AF --> S3_AF["☁️ S3 Sync +<br/>CloudFront Invalidate"]:::deployStyle
 
-    PF["🌍 Public FE Pipeline"]:::sourceStyle --> CB_PF["🏗️ CodeBuild\nnpm build + SSM env inject"]:::buildStyle
-    CB_PF --> S3_PF["☁️ S3 Sync +\nCloudFront Invalidate"]:::deployStyle
+    PF["🌍 Public FE Pipeline"]:::sourceStyle --> CB_PF["🏗️ CodeBuild<br/>npm build + SSM env inject"]:::buildStyle
+    CB_PF --> S3_PF["☁️ S3 Sync +<br/>CloudFront Invalidate"]:::deployStyle
 ```
 
 ### Canary Deployment (Lambda)
@@ -371,12 +372,12 @@ flowchart TD
     classDef rollbackStyle fill:#7b241c,stroke:#e74c3c,color:#fff,rx:6
     classDef decisionStyle fill:#17202a,stroke:#717d7e,color:#fff
 
-    D["🚀 New Lambda Version v2\ndeployed"]:::deployStyle --> S["🔀 Traffic Shift\n90% v1 · 10% v2"]:::deployStyle
-    S --> W["⏱️ 5 Minute\nWatch Window"]:::watchStyle
-    W --> M["📊 CloudWatch\nMonitors error alarms"]:::watchStyle
-    M --> OK{"🔍 Alarm\nfired?"}:::decisionStyle
-    OK -->|"✅ No alarms"| FULL["🎉 100% traffic to v2\nDeployment complete"]:::successStyle
-    OK -->|"🚨 Alarm fired"| RB["↩️ Automatic rollback\n100% back to v1"]:::rollbackStyle
+    D["🚀 New Lambda Version v2<br/>deployed"]:::deployStyle --> S["🔀 Traffic Shift<br/>90% v1 · 10% v2"]:::deployStyle
+    S --> W["⏱️ 5 Minute<br/>Watch Window"]:::watchStyle
+    W --> M["📊 CloudWatch<br/>Monitors error alarms"]:::watchStyle
+    M --> OK{"🔍 Alarm<br/>fired?"}:::decisionStyle
+    OK -->|"✅ No alarms"| FULL["🎉 100% traffic to v2<br/>Deployment complete"]:::successStyle
+    OK -->|"🚨 Alarm fired"| RB["↩️ Automatic rollback<br/>100% back to v1"]:::rollbackStyle
 ```
 
 ### Build-time Config Injection
@@ -444,12 +445,12 @@ flowchart TD
     classDef endpointStyle fill:#1b2631,stroke:#717d7e,color:#fff
 
     R(["🌐 Incoming Request"]):::endpointStyle
-    R --> L1["🌍 Layer 1 · Network Edge\nCloudFront HTTPS only · TLS 1.2\nNo direct S3 or Lambda URLs"]:::layer1Style
-    L1 --> L2["🔐 Layer 2 · Authentication\nCognito JWT at API Gateway\nfor all admin routes"]:::layer2Style
-    L2 --> L3["🛡️ Layer 3 · Authorization\n16 per-Lambda IAM policies\nPublic Lambda cannot write"]:::layer3Style
-    L3 --> L4["🔒 Layer 4 · Data\nS3 Block Public Access · CloudFront OAC\nDynamoDB encryption at rest"]:::layer4Style
-    L4 --> L5["✅ Layer 5 · Application\nContent-type validation · Input validation\nNo self-registration"]:::layer5Style
-    L5 --> RES(["✨ Request Processed\nSecurely"]):::endpointStyle
+    R --> L1["🌍 Layer 1 · Network Edge<br/>CloudFront HTTPS only · TLS 1.2<br/>No direct S3 or Lambda URLs"]:::layer1Style
+    L1 --> L2["🔐 Layer 2 · Authentication<br/>Cognito JWT at API Gateway<br/>for all admin routes"]:::layer2Style
+    L2 --> L3["🛡️ Layer 3 · Authorization<br/>16 per-Lambda IAM policies<br/>Public Lambda cannot write"]:::layer3Style
+    L3 --> L4["🔒 Layer 4 · Data<br/>S3 Block Public Access · CloudFront OAC<br/>DynamoDB encryption at rest"]:::layer4Style
+    L4 --> L5["✅ Layer 5 · Application<br/>Content-type validation · Input validation<br/>No self-registration"]:::layer5Style
+    L5 --> RES(["✨ Request Processed<br/>Securely"]):::endpointStyle
 ```
 
 ---

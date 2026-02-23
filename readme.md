@@ -62,46 +62,46 @@ This is a **production-style serverless blog platform** built end-to-end on AWS 
 The platform is split into three clearly separated zones. Failure in one zone does not cascade to the others.
 
 ```mermaid
-flowchart LR
-    classDef userStyle fill:#6e2f1a,stroke:#e59866,color:#fff
-    classDef publicStyle fill:#1a4f7a,stroke:#2e86c1,color:#fff
-    classDef adminStyle fill:#145a32,stroke:#27ae60,color:#fff
-    classDef asyncStyle fill:#4a235a,stroke:#9b59b6,color:#fff
-    classDef dbStyle fill:#2c3e50,stroke:#7f8c8d,color:#fff
-    classDef busStyle fill:#784212,stroke:#f39c12,color:#fff
-    classDef alarmStyle fill:#7b241c,stroke:#e74c3c,color:#fff
+flowchart TD
+    classDef userStyle fill:#f97316,stroke:#c2410c,color:#fff
+    classDef publicStyle fill:#2563eb,stroke:#1d4ed8,color:#fff
+    classDef adminStyle fill:#16a34a,stroke:#15803d,color:#fff
+    classDef asyncStyle fill:#7c3aed,stroke:#6d28d9,color:#fff
+    classDef dbStyle fill:#475569,stroke:#334155,color:#fff
+    classDef busStyle fill:#d97706,stroke:#b45309,color:#fff
+    classDef alarmStyle fill:#dc2626,stroke:#b91c1c,color:#fff
 
     subgraph PUBLIC["🌍  Public Zone"]
         PB(["👤 User"]):::userStyle --> PCF["☁️ CloudFront"]:::publicStyle
-        PCF --> PS3["🗂️ S3 SPA"]:::publicStyle
-        PCF --> PAGW["🔓 API Gateway"]:::publicStyle
-        PAGW --> PL["⚡ Lambda"]:::publicStyle
+        PCF --> PS3["🗂️ S3  ·  React SPA"]:::publicStyle
+        PCF --> PAGW["🔓 API Gateway  ·  No Auth"]:::publicStyle
+        PAGW --> PL["⚡ Lambda  ·  Read Only"]:::publicStyle
         PL --> DDB[("🗄️ DynamoDB")]:::dbStyle
     end
 
     subgraph ADMIN["🔐  Admin Zone"]
         AB(["👤 Admin"]):::userStyle --> ACF["☁️ CloudFront"]:::adminStyle
-        ACF --> AS3["🗂️ S3 CMS"]:::adminStyle
-        ACF --> AAGW["🛡️ API Gateway"]:::adminStyle
-        AAGW --> AL["⚡ Lambda"]:::adminStyle
+        ACF --> AS3["🗂️ S3  ·  React CMS"]:::adminStyle
+        ACF --> AAGW["🛡️ API Gateway  ·  Cognito JWT"]:::adminStyle
+        AAGW --> AL["⚡ Lambda  ·  Full CRUD"]:::adminStyle
         AL --> DDB2[("🗄️ DynamoDB")]:::dbStyle
-        AL --> EB(["🚌 EventBridge"]):::busStyle
+        AL --> EB(["🚌 EventBridge Bus"]):::busStyle
     end
 
     subgraph ASYNC["⚡  Async Zone"]
-        NL["🔔 Notifications Lambda"]:::asyncStyle --> SES["📧 SES"]:::asyncStyle
-        CL["🧹 Cleanup Lambda"]:::asyncStyle --> S3M["🗑️ S3 Media"]:::asyncStyle
-        NL -->|exhausted| DLQ1["⚠️ SQS DLQ"]:::alarmStyle
-        CL -->|exhausted| DLQ2["⚠️ SQS DLQ"]:::alarmStyle
+        NL["🔔 Notifications Lambda"]:::asyncStyle --> SES["📧 SES  ·  Email"]:::asyncStyle
+        CL["🧹 Cleanup Lambda"]:::asyncStyle --> S3M["🗑️ S3  ·  Delete Media"]:::asyncStyle
+        NL -->|retries exhausted| DLQ1["⚠️ SQS DLQ"]:::alarmStyle
+        CL -->|retries exhausted| DLQ2["⚠️ SQS DLQ"]:::alarmStyle
         DLQ1 & DLQ2 --> CWA["🚨 CloudWatch Alarm"]:::alarmStyle
     end
 
     EB -->|LeadCreated| NL
     EB -->|PostDeleted| CL
 
-    style PUBLIC fill:#0d2137,stroke:#2e86c1,color:#fff
-    style ADMIN fill:#0d2b1a,stroke:#27ae60,color:#fff
-    style ASYNC fill:#1e0d2b,stroke:#9b59b6,color:#fff
+    style PUBLIC fill:#eff6ff,stroke:#2563eb,color:#1e3a5f
+    style ADMIN fill:#f0fdf4,stroke:#16a34a,color:#14532d
+    style ASYNC fill:#f5f3ff,stroke:#7c3aed,color:#3b0764
 ```
 
 ### Architecture Diagram

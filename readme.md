@@ -63,34 +63,42 @@ The platform is split into three clearly separated zones. Failure in one zone do
 
 ```mermaid
 flowchart TD
-    subgraph PUBLIC[" Public Zone"]
+    classDef publicStyle fill:#1a4f7a,stroke:#2e86c1,color:#fff,rx:6
+    classDef adminStyle fill:#145a32,stroke:#27ae60,color:#fff,rx:6
+    classDef asyncStyle fill:#4a235a,stroke:#9b59b6,color:#fff,rx:6
+    classDef dbStyle fill:#1b2631,stroke:#717d7e,color:#fff,rx:6
+    classDef userStyle fill:#6e2f1a,stroke:#e59866,color:#fff
+    classDef busStyle fill:#784212,stroke:#f39c12,color:#fff
+    classDef alarmStyle fill:#7b241c,stroke:#e74c3c,color:#fff,rx:6
+
+    subgraph PUBLIC["🌍  Public Zone"]
         direction TB
-        PB([User Browser]) --> PCF[CloudFront CDN]
-        PCF --> PS3[S3 - React SPA]
-        PCF --> PAGW[API Gateway - No Auth]
-        PAGW --> PL[Lambda - Read Only]
-        PL --> DDB[(DynamoDB - GSI Query)]
+        PB(["👤 User Browser"]):::userStyle --> PCF["☁️ CloudFront CDN"]:::publicStyle
+        PCF --> PS3["🗂️ S3 · React SPA"]:::publicStyle
+        PCF --> PAGW["🔓 API Gateway\nNo Auth"]:::publicStyle
+        PAGW --> PL["⚡ Lambda\nRead Only"]:::publicStyle
+        PL --> DDB[("🗄️ DynamoDB\nGSI Query")]:::dbStyle
     end
 
-    subgraph ADMIN[" Admin Zone"]
+    subgraph ADMIN["🔐  Admin Zone"]
         direction TB
-        AB([Admin Browser]) --> ACF[CloudFront CDN]
-        ACF --> AS3[S3 - React CMS]
-        ACF --> AAGW[API Gateway - Cognito JWT]
-        AAGW --> AL[Lambda - Full CRUD]
-        AL --> DDB2[(DynamoDB - Full R/W)]
-        AL --> EB([EventBridge Bus])
+        AB(["👤 Admin Browser"]):::userStyle --> ACF["☁️ CloudFront CDN"]:::adminStyle
+        ACF --> AS3["🗂️ S3 · React CMS"]:::adminStyle
+        ACF --> AAGW["🛡️ API Gateway\nCognito JWT"]:::adminStyle
+        AAGW --> AL["⚡ Lambda\nFull CRUD"]:::adminStyle
+        AL --> DDB2[("🗄️ DynamoDB\nFull R/W")]:::dbStyle
+        AL --> EB(["🚌 EventBridge Bus"]):::busStyle
     end
 
-    subgraph ASYNC[" Async Zone"]
+    subgraph ASYNC["⚡  Async Zone"]
         direction TB
-        EB --> NL[Notifications Lambda]
-        EB --> CL[Cleanup Lambda]
-        NL --> SES[SES - Send Email]
-        CL --> S3M[S3 - Delete Media]
-        NL -->|retries exhausted| DLQ1[SQS DLQ]
-        CL -->|retries exhausted| DLQ2[SQS DLQ]
-        DLQ1 --> CWA[CloudWatch Alarm]
+        EB --> NL["🔔 Notifications\nLambda"]:::asyncStyle
+        EB --> CL["🧹 Cleanup\nLambda"]:::asyncStyle
+        NL --> SES["📧 SES · Send Email"]:::asyncStyle
+        CL --> S3M["🗑️ S3 · Delete Media"]:::asyncStyle
+        NL -->|retries exhausted| DLQ1["⚠️ SQS DLQ"]:::alarmStyle
+        CL -->|retries exhausted| DLQ2["⚠️ SQS DLQ"]:::alarmStyle
+        DLQ1 --> CWA["🚨 CloudWatch Alarm"]:::alarmStyle
         DLQ2 --> CWA
     end
 ```
@@ -215,26 +223,26 @@ Amazon Cognito User Pool provides JWT-based authentication for the admin CMS.
 
 ```mermaid
 sequenceDiagram
-    actor Admin as Admin Browser
-    participant Amplify as AWS Amplify
-    participant Cognito as Amazon Cognito
-    participant APIGW as API Gateway
-    participant Lambda as Lambda
+    actor Admin as 👤 Admin Browser
+    participant Amplify as 📱 AWS Amplify
+    participant Cognito as 🔐 Amazon Cognito
+    participant APIGW as 🌐 API Gateway
+    participant Lambda as ⚡ Lambda
 
     Admin->>Amplify: Enter credentials
     Amplify->>Cognito: Authenticate
-    Cognito-->>Amplify: JWT ID Token
+    Cognito-->>Amplify: ✅ JWT ID Token
     Amplify-->>Admin: Signed in
 
     Admin->>APIGW: API request + Authorization Bearer JWT
     APIGW->>Cognito: Validate token
-    alt Valid Token
+    alt ✅ Valid Token
         Cognito-->>APIGW: Authorized
         APIGW->>Lambda: Invoke
         Lambda-->>Admin: 200 OK
-    else Invalid or Missing Token
+    else ❌ Invalid or Missing Token
         Cognito-->>APIGW: Unauthorized
-        APIGW-->>Admin: 401 - Lambda never invoked
+        APIGW-->>Admin: 401 — Lambda never invoked
     end
 ```
 
@@ -251,26 +259,33 @@ A custom EventBridge bus decouples API handlers from their side effects.
 
 ```mermaid
 flowchart TD
-    U([User]) -->|POST /leads| LL[Leads Lambda]
-    A([Admin]) -->|DELETE /admin/posts/:id| AL[Admin Lambda]
+    classDef userStyle fill:#6e2f1a,stroke:#e59866,color:#fff
+    classDef lambdaStyle fill:#145a32,stroke:#27ae60,color:#fff,rx:6
+    classDef dbStyle fill:#1b2631,stroke:#717d7e,color:#fff,rx:6
+    classDef busStyle fill:#784212,stroke:#f39c12,color:#fff
+    classDef asyncStyle fill:#4a235a,stroke:#9b59b6,color:#fff,rx:6
+    classDef dlqStyle fill:#7b241c,stroke:#e74c3c,color:#fff,rx:6
 
-    LL --> DDB1[(DynamoDB - Write Lead)]
-    LL -->|instant 201| U
-    LL -->|emit LeadCreated| EB([EventBridge Bus])
+    U(["👤 User"]):::userStyle -->|POST /leads| LL["⚡ Leads Lambda"]:::lambdaStyle
+    A(["🔐 Admin"]):::userStyle -->|DELETE /admin/posts/:id| AL["⚡ Admin Lambda"]:::lambdaStyle
 
-    AL --> DDB2[(DynamoDB - Delete Post)]
-    AL -->|instant 200| A
-    AL -->|emit PostDeleted| EB
+    LL --> DDB1[("🗄️ DynamoDB\nWrite Lead")]:::dbStyle
+    LL -->|"✅ instant 201"| U
+    LL -->|"📤 emit LeadCreated"| EB(["🚌 EventBridge Bus"]):::busStyle
 
-    EB -->|LeadCreated rule| NL[Notifications Lambda]
-    NL --> SES[SES - Email to Admin]
-    NL -->|fail after 10 retries| DLQ1[SQS DLQ]
+    AL --> DDB2[("🗄️ DynamoDB\nDelete Post")]:::dbStyle
+    AL -->|"✅ instant 200"| A
+    AL -->|"📤 emit PostDeleted"| EB
 
-    EB -->|PostDeleted rule| CL[Cleanup Lambda]
-    CL --> S3M[S3 - Delete Media]
-    CL -->|fail after 10 retries| DLQ2[SQS DLQ]
+    EB -->|LeadCreated rule| NL["🔔 Notifications Lambda"]:::asyncStyle
+    NL --> SES["📧 SES · Email to Admin"]:::asyncStyle
+    NL -->|fail after 10 retries| DLQ1["⚠️ SQS DLQ"]:::dlqStyle
 
-    DLQ1 --> CWA[CloudWatch Alarm]
+    EB -->|PostDeleted rule| CL["🧹 Cleanup Lambda"]:::asyncStyle
+    CL --> S3M["🗑️ S3 · Delete Media"]:::dbStyle
+    CL -->|fail after 10 retries| DLQ2["⚠️ SQS DLQ"]:::dlqStyle
+
+    DLQ1 --> CWA["🚨 CloudWatch Alarm"]:::dlqStyle
     DLQ2 --> CWA
 ```
 
@@ -286,32 +301,32 @@ File uploads bypass Lambda entirely using the **Valet Key pattern**.
 
 ```mermaid
 sequenceDiagram
-    actor Browser
-    participant APIGW as API Gateway Admin
-    participant Cognito as Cognito Authorizer
-    participant Lambda as Presign Lambda
-    participant S3 as S3 Media Bucket
-    participant CF as CloudFront CDN
+    actor Browser as 🖥️ Browser
+    participant APIGW as 🌐 API Gateway Admin
+    participant Cognito as 🔐 Cognito Authorizer
+    participant Lambda as ⚡ Presign Lambda
+    participant S3 as 🗂️ S3 Media Bucket
+    participant CF as ☁️ CloudFront CDN
 
-    Note over Browser,CF: Phase 1 - Request Upload Permission
+    Note over Browser,CF: 📋 Phase 1 — Request Upload Permission
     Browser->>APIGW: POST /admin/media/upload_url
     APIGW->>Cognito: Validate JWT
-    Cognito-->>APIGW: Authorized
+    Cognito-->>APIGW: ✅ Authorized
     APIGW->>Lambda: Invoke
-    Lambda->>Lambda: Validate content-type - image/jpeg and image/png allowed
-    Lambda->>S3: Generate presigned PUT URL with 5 min TTL
+    Lambda->>Lambda: 🔍 Validate content-type (image/jpeg · image/png)
+    Lambda->>S3: Generate presigned PUT URL · 5 min TTL
     S3-->>Lambda: Presigned URL
     Lambda-->>Browser: presigned_url in response body
 
-    Note over Browser,CF: Phase 2 - Direct Upload - No Lambda - No API Gateway
-    Browser->>S3: PUT presigned URL with file bytes - no size limit
-    S3-->>Browser: 200 OK
+    Note over Browser,CF: 📤 Phase 2 — Direct Upload (No Lambda · No API Gateway)
+    Browser->>S3: PUT presigned URL with file bytes
+    S3-->>Browser: ✅ 200 OK
 
-    Note over Browser,CF: Phase 3 - Serve via CDN
+    Note over Browser,CF: 🖼️ Phase 3 — Serve via CDN
     Browser->>CF: GET /media/image.jpg
-    CF->>S3: Fetch via OAC - private bucket
+    CF->>S3: Fetch via OAC (private bucket)
     S3-->>CF: Image bytes
-    CF-->>Browser: Cached image response
+    CF-->>Browser: ⚡ Cached image response
 ```
 
 **Security note:** The S3 media bucket has no public access. The presign Lambda validates allowed content-types before generating the URL — preventing malicious file types from being hosted.
@@ -324,18 +339,24 @@ Three separate CodePipeline pipelines ensure that a change to the public fronten
 
 ```mermaid
 flowchart TD
-    GH[GitHub Source Code] --> BE & AF & PF
+    classDef sourceStyle fill:#1a4f7a,stroke:#2e86c1,color:#fff,rx:6
+    classDef buildStyle fill:#145a32,stroke:#27ae60,color:#fff,rx:6
+    classDef deployStyle fill:#4a235a,stroke:#9b59b6,color:#fff,rx:6
+    classDef successStyle fill:#1d6a27,stroke:#2ecc71,color:#fff,rx:6
+    classDef rollbackStyle fill:#7b241c,stroke:#e74c3c,color:#fff,rx:6
 
-    BE[Backend Pipeline] --> CB_BE[CodeBuild - Package Lambda ZIPs]
-    CB_BE --> CD[CodeDeploy - Canary 10 pct for 5 min]
-    CD -->|healthy| LIVE[Lambda live alias - 100 pct v2]
-    CD -->|alarm fires| RB[Auto Rollback to v1]
+    GH["📦 GitHub\nSource Code"]:::sourceStyle --> BE & AF & PF
 
-    AF[Admin FE Pipeline] --> CB_AF[CodeBuild - npm build + SSM env inject]
-    CB_AF --> S3_AF[S3 Sync + CloudFront Invalidate]
+    BE["🔧 Backend Pipeline"]:::sourceStyle --> CB_BE["🏗️ CodeBuild\nPackage Lambda ZIPs"]:::buildStyle
+    CB_BE --> CD["🚀 CodeDeploy\nCanary 10% · 5 min"]:::deployStyle
+    CD -->|"✅ healthy"| LIVE["✨ Lambda live alias\n100% v2"]:::successStyle
+    CD -->|"🚨 alarm fires"| RB["↩️ Auto Rollback\nto v1"]:::rollbackStyle
 
-    PF[Public FE Pipeline] --> CB_PF[CodeBuild - npm build + SSM env inject]
-    CB_PF --> S3_PF[S3 Sync + CloudFront Invalidate]
+    AF["🖥️ Admin FE Pipeline"]:::sourceStyle --> CB_AF["🏗️ CodeBuild\nnpm build + SSM env inject"]:::buildStyle
+    CB_AF --> S3_AF["☁️ S3 Sync +\nCloudFront Invalidate"]:::deployStyle
+
+    PF["🌍 Public FE Pipeline"]:::sourceStyle --> CB_PF["🏗️ CodeBuild\nnpm build + SSM env inject"]:::buildStyle
+    CB_PF --> S3_PF["☁️ S3 Sync +\nCloudFront Invalidate"]:::deployStyle
 ```
 
 ### Canary Deployment (Lambda)
@@ -344,12 +365,18 @@ CodeDeploy shifts 10% of Lambda traffic to the new version for 5 minutes before 
 
 ```mermaid
 flowchart TD
-    D[New Lambda Version v2 deployed] --> S[Traffic Shift - 90 pct v1 and 10 pct v2]
-    S --> W[5 Minute Watch Window]
-    W --> M[CloudWatch monitors error alarms]
-    M --> OK{Alarm fired?}
-    OK -->|No alarms| FULL[100 pct traffic to v2 - Deployment complete]
-    OK -->|Alarm fired| RB[Automatic rollback - 100 pct back to v1]
+    classDef deployStyle fill:#1a4f7a,stroke:#2e86c1,color:#fff,rx:6
+    classDef watchStyle fill:#784212,stroke:#f39c12,color:#fff,rx:6
+    classDef successStyle fill:#145a32,stroke:#27ae60,color:#fff,rx:6
+    classDef rollbackStyle fill:#7b241c,stroke:#e74c3c,color:#fff,rx:6
+    classDef decisionStyle fill:#17202a,stroke:#717d7e,color:#fff
+
+    D["🚀 New Lambda Version v2\ndeployed"]:::deployStyle --> S["🔀 Traffic Shift\n90% v1 · 10% v2"]:::deployStyle
+    S --> W["⏱️ 5 Minute\nWatch Window"]:::watchStyle
+    W --> M["📊 CloudWatch\nMonitors error alarms"]:::watchStyle
+    M --> OK{"🔍 Alarm\nfired?"}:::decisionStyle
+    OK -->|"✅ No alarms"| FULL["🎉 100% traffic to v2\nDeployment complete"]:::successStyle
+    OK -->|"🚨 Alarm fired"| RB["↩️ Automatic rollback\n100% back to v1"]:::rollbackStyle
 ```
 
 ### Build-time Config Injection
@@ -409,13 +436,20 @@ Each Lambda function has exactly the permissions it needs. Nothing more.
 
 ```mermaid
 flowchart TD
-    R([Incoming Request])
-    R --> L1[Layer 1 - Network Edge - CloudFront HTTPS only TLS 1.2 - No direct S3 or Lambda URLs]
-    L1 --> L2[Layer 2 - Authentication - Cognito JWT at API Gateway for all admin routes]
-    L2 --> L3[Layer 3 - Authorization - 16 per-Lambda IAM policies - Public Lambda cannot write]
-    L3 --> L4[Layer 4 - Data - S3 Block Public Access - CloudFront OAC - DynamoDB encryption]
-    L4 --> L5[Layer 5 - Application - Content-type validation - Input validation - No self-registration]
-    L5 --> RES([Request Processed Securely])
+    classDef layer1Style fill:#1a4f7a,stroke:#2e86c1,color:#fff,rx:6
+    classDef layer2Style fill:#145a32,stroke:#27ae60,color:#fff,rx:6
+    classDef layer3Style fill:#7b241c,stroke:#e74c3c,color:#fff,rx:6
+    classDef layer4Style fill:#4a235a,stroke:#9b59b6,color:#fff,rx:6
+    classDef layer5Style fill:#7d6608,stroke:#f1c40f,color:#000,rx:6
+    classDef endpointStyle fill:#1b2631,stroke:#717d7e,color:#fff
+
+    R(["🌐 Incoming Request"]):::endpointStyle
+    R --> L1["🌍 Layer 1 · Network Edge\nCloudFront HTTPS only · TLS 1.2\nNo direct S3 or Lambda URLs"]:::layer1Style
+    L1 --> L2["🔐 Layer 2 · Authentication\nCognito JWT at API Gateway\nfor all admin routes"]:::layer2Style
+    L2 --> L3["🛡️ Layer 3 · Authorization\n16 per-Lambda IAM policies\nPublic Lambda cannot write"]:::layer3Style
+    L3 --> L4["🔒 Layer 4 · Data\nS3 Block Public Access · CloudFront OAC\nDynamoDB encryption at rest"]:::layer4Style
+    L4 --> L5["✅ Layer 5 · Application\nContent-type validation · Input validation\nNo self-registration"]:::layer5Style
+    L5 --> RES(["✨ Request Processed\nSecurely"]):::endpointStyle
 ```
 
 ---
